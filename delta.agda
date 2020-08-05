@@ -2,6 +2,28 @@ open import Prelude
 open import Nat
 open import List
 
+-- The contents of this file were originally written in a different codebase,
+-- which was itself a descendant of a prior codebase that had been using non-standard
+-- definitions of naturals and other basic definitions. As such this code has
+-- inherited these non-standard idioms, as seen in Prelude, Nat, and List. Ideally,
+-- this file would be refactored to use the Agda standard library instead, but beyond
+-- the significant effort of refactoring, the Agda standard library appears not to be
+-- packaged with Agda, and must be installed separately. The difficulties inherent in
+-- attempting to use a "standard library" that is not sufficiently standard as to be
+-- included with Agda itself, added to the difficulties of refactoring, have led us
+-- to continue with the the non-standard forms and definitions. We hope that they are
+-- fairly self-explanatory and intuitive. Below we note some of our idioms that may
+-- not be obvious:
+-- * abort used to prove any goal given ⊥
+-- * == is used for reflexive equality
+-- * Z is zero, 1+ is suc
+-- * ≤ is defined as data, < is defined as n < m = n ≤ m ∧ n ≠ m
+-- * TODO if we don't switch to truncation, we need to talk about subtraction
+-- * l⟦i⟧ is used to (maybe) get the ith element of list l
+--
+-- Agda's encapsulation facilities seem insufficient to properly encapsulate the
+-- raw data of a delta dictionary. Thus, we do not use encapsulation, but leave
+-- comments explaining that list functionality must not be used on a dlt
 module delta where
   -- helper function
   diff-1 : ∀{n m} → n < m → Nat
