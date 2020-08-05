@@ -13,15 +13,15 @@ module delta where
   _dlt : Set → Set
   A dlt = List (Nat ∧ A)
 
-  -- nil context
+  -- nil dlt
   ∅ : {A : Set} → A dlt
   ∅ = []
 
-  -- singleton context
+  -- singleton dlt
   ■_ : {A : Set} → (Nat ∧ A) → A dlt
   ■_ (x , a) = (x , a) :: []
 
-  -- context extension/insertion - never use _::_
+  -- dlt extension/insertion - never use _::_
   _,,_ : ∀{A} → A dlt → (Nat ∧ A) → A dlt
   [] ,, (x , a) = ■ (x , a)
   ((hx , ha) :: t) ,, (x , a) with <dec x hx
@@ -31,7 +31,7 @@ module delta where
 
   infixl 10 _,,_
 
-  -- membership, or presence, in a context
+  -- membership, or presence, in a dlt
   data _∈_ : {A : Set} (p : Nat ∧ A) → (Γ : A dlt) → Set where
     InH : {A : Set} {Γ : A dlt} {x : Nat} {a : A} →
            (x , a) ∈ ((x , a) :: Γ)
@@ -39,11 +39,11 @@ module delta where
            (x , a) ∈ Γ →
            ((x + 1+ s , a)) ∈ ((s , a') :: Γ)
 
-  -- the domain of a context
+  -- the domain of a dlt
   dom : {A : Set} → A dlt → Nat → Set
   dom {A} Γ x = Σ[ a ∈ A ] ((x , a) ∈ Γ)
 
-  -- apartness for contexts
+  -- apartness for dlts
   _#_ : {A : Set} (n : Nat) → (Γ : A dlt) → Set
   x # Γ = dom Γ x → ⊥
 
@@ -56,23 +56,23 @@ module delta where
                    a1 == a2
 
   -- TODO theorems
-  -- maps f across the values of the context
-  ctxmap : {A B : Set} → (A → B) → A dlt → B dlt
-  ctxmap f Γ = map (λ {(hx , ha) → (hx , f ha)}) Γ
+  -- maps f across the values of the dlt
+  dltmap : {A B : Set} → (A → B) → A dlt → B dlt
+  dltmap f Γ = map (λ {(hx , ha) → (hx , f ha)}) Γ
 
   -- TODO theorems
-  -- returns a list of the values stored in the context
+  -- returns a list of the values stored in the dlt
   dlt⇒values : {A : Set} → A dlt → List A
 
-  -- converts a list of key-value pairs into a context, with later pairs in the list
+  -- converts a list of key-value pairs into a dlt, with later pairs in the list
   -- overriding bindings definend by previous pairs
   list⇒dlt : {A : Set} → List (Nat ∧ A) → A dlt
 
-  -- converts a context into a list of key-value pairs; the inverse of list⇒dlt
+  -- converts a dlt into a list of key-value pairs; the inverse of list⇒dlt
   dlt⇒list : {A : Set} → A dlt → List (Nat ∧ A)
 
   -- TODO theorems
-  -- converts a list of key-value pairs into a multi-context, where each value of
+  -- converts a list of key-value pairs into a multi-dlt, where each value of
   -- the result is the sublist of values from the former that were mapped to by the
   -- corresponding key
   list⇒list-dlt : {A : Set} → List (Nat ∧ A) → (List A) dlt
@@ -265,22 +265,22 @@ module delta where
           InT (x∈Γ→x∈Γ+ (λ where refl → x≠x' (m-n+n==m (n<m→1+n≤m s<x'))) x∈Γ)
 
   -- Decidability of membership
-  -- This also packages up an appeal to context membership into a form that
+  -- This also packages up an appeal to dlt membership into a form that
   -- lets us retain more information
-  ctxindirect : {A : Set} (Γ : A dlt) (x : Nat) → dom Γ x ∨ x # Γ
-  ctxindirect [] x = Inr (λ ())
-  ctxindirect ((hx , ha) :: t) x
+  dltindirect : {A : Set} (Γ : A dlt) (x : Nat) → dom Γ x ∨ x # Γ
+  dltindirect [] x = Inr (λ ())
+  dltindirect ((hx , ha) :: t) x
     with <dec x hx
   ... | Inl x<hx       = Inr (too-small x<hx)
   ... | Inr (Inl refl) = Inl (ha , InH)
   ... | Inr (Inr hx<x)
-    with ctxindirect t (diff-1 hx<x)
-  ctxindirect ((hx , ha) :: t) x | Inr (Inr hx<x) | Inl (a , rec) =
+    with dltindirect t (diff-1 hx<x)
+  dltindirect ((hx , ha) :: t) x | Inr (Inr hx<x) | Inl (a , rec) =
     Inl (a , tr
                (λ y → (y , a) ∈ ((hx , ha) :: t))
                (m-n+n==m (n<m→1+n≤m hx<x))
                (InT rec))
-  ctxindirect {A} ((hx , ha) :: t) x | Inr (Inr hx<x) | Inr dne =
+  dltindirect {A} ((hx , ha) :: t) x | Inr (Inr hx<x) | Inr dne =
     Inr x∉Γ
     where
       x∉Γ : Σ[ a ∈ A ] ((x , a) ∈ ((hx , ha) :: t)) → ⊥
@@ -289,28 +289,28 @@ module delta where
       ... | InT {x = s} x-hx-1∈t
         rewrite ! (undiff-1 hx s hx<x) = dne (_ , x-hx-1∈t)
 
-  -- contexts give at most one binding for each variable
-  ctxunicity : {A : Set} {Γ : A dlt} {x : Nat} {a a' : A} →
+  -- dlts give at most one binding for each variable
+  dltunicity : {A : Set} {Γ : A dlt} {x : Nat} {a a' : A} →
                  (x , a) ∈ Γ →
                  (x , a') ∈ Γ →
                  a == a'
-  ctxunicity ah a'h
+  dltunicity ah a'h
     with lookup-cons-2 ah | lookup-cons-2 a'h
   ... | ah' | a'h' = someinj (! ah' · a'h')
 
-  -- everything is apart from the nil context
+  -- everything is apart from the nil dlt
   x#∅ : {A : Set} {x : Nat} → _#_ {A} x ∅
   x#∅ (_ , ())
 
-  -- if an index is in the domain of a singleton context, it's the only
-  -- index in the context
+  -- if an index is in the domain of a singleton dlt, it's the only
+  -- index in the dlt
   lem-dom-eq : {A : Set} {a : A} {n m : Nat} →
                  dom (■ (m , a)) n →
                  n == m
   lem-dom-eq (_ , InH) = refl
   lem-dom-eq (_ , InT ())
 
-  -- If two contexts are semantically equivalent
+  -- If two dlts are semantically equivalent
   -- (i.e. they represent the same mapping from ids to values),
   -- then they are physically equal as judged by _==_
   dlt-==-eqv : {A : Set} {Γ1 Γ2 : A dlt} →
@@ -339,7 +339,7 @@ module delta where
   ... | Inr (Inr hx2<hx1) | Inr (Inr hx1<hx2)
           = abort (<antisym hx1<hx2 hx2<hx1)
 
-  -- equality of contexts is decidable
+  -- equality of dlts is decidable
   dlt-==-dec : {A : Set}
                 (Γ1 Γ2 : A dlt) →
                 ((a1 a2 : A) → a1 == a2 ∨ a1 ≠ a2) →
@@ -354,13 +354,13 @@ module delta where
   ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
   ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
 
-  -- A useful way to destruct context membership. Never destruct a context via _::_
+  -- A useful way to destruct dlt membership. Never destruct a dlt via _::_
   dlt-split : {A : Set} {Γ : A dlt} {n m : Nat} {an am : A} →
                 (n , an) ∈ (Γ ,, (m , am)) →
                 (n ≠ m ∧ (n , an) ∈ Γ) ∨ (n == m ∧ an == am)
   dlt-split {Γ = Γ} {n} {m} {an} {am} n∈Γ+
     with natEQ n m
-  ... | Inl refl = Inr (refl , ctxunicity n∈Γ+ (x,a∈Γ,,x,a {Γ = Γ}))
+  ... | Inl refl = Inr (refl , dltunicity n∈Γ+ (x,a∈Γ,,x,a {Γ = Γ}))
   ... | Inr n≠m  = Inl (n≠m , x∈Γ+→x∈Γ n≠m n∈Γ+)
 
   dlt-delete : {A : Set} {Γ : A dlt} {n : Nat} {a : A} →
@@ -401,7 +401,7 @@ module delta where
         lem' | Inr (Inl false)     = abort (lemma-math' {x1 = Z} (! false))
         lem' | Inr (Inr n'<x+1+n') rewrite ! (undiff-1 n' x n'<x+1+n') = refl
 
-  -- Allows the elimination of contexts. Never destruct a context via _::_
+  -- Allows the elimination of dlts. Never destruct a dlt via _::_
   dlt-elim : {A : Set} {Γ : A dlt} →
               Γ == ∅
                 ∨
@@ -454,7 +454,7 @@ module delta where
                x # Γ →
                x # (Γ ,, (x' , a'))
   x#Γ→x#Γ+ {Γ = Γ} {x} {x'} {a'} x≠x' x#Γ
-    with ctxindirect (Γ ,, (x' , a')) x
+    with dltindirect (Γ ,, (x' , a')) x
   ... | Inl (_ , x∈Γ+) = abort (x#Γ (_ , x∈Γ+→x∈Γ x≠x' x∈Γ+))
   ... | Inr x#Γ+       = x#Γ+
 
@@ -462,7 +462,7 @@ module delta where
                x # (Γ ,, (x' , a')) →
                x # Γ
   x#Γ+→x#Γ {Γ = Γ} {x} {x'} {a'} x#Γ+
-    with ctxindirect Γ x
+    with dltindirect Γ x
   ... | Inr x#Γ       = x#Γ
   ... | Inl (_ , x∈Γ)
     with natEQ x x'
@@ -481,7 +481,7 @@ module delta where
                  Γ ⦃⦃ x ⦄⦄ == None →
                  x # Γ
   lookup-cp-2 {Γ = Γ} {x} x#Γ
-    with ctxindirect Γ x
+    with dltindirect Γ x
   ... | Inl (_ , x∈Γ) = abort (somenotnone ((! (lookup-cons-2 x∈Γ)) · x#Γ))
   ... | Inr x#'Γ      = x#'Γ
 
@@ -512,7 +512,7 @@ module delta where
       where
         f : (List A) dlt → Nat ∧ A → (List A) dlt
         f Γ (n , a)
-          with ctxindirect Γ n
+          with dltindirect Γ n
         ... | Inl (as , n∈Γ)
           = Γ ,, (n , a :: as)
         ... | Inr n#Γ
@@ -709,7 +709,7 @@ module delta where
                (Γ ,, (x1 , a1) ,, (x2 , a2)) ⦃⦃ x ⦄⦄ ==
                (Γ ,, (x2 , a2) ,, (x1 , a1)) ⦃⦃ x ⦄⦄
         fun x
-          with natEQ x x1 | natEQ x x2 | ctxindirect Γ x
+          with natEQ x x1 | natEQ x x2 | dltindirect Γ x
         fun x  | Inl refl | Inl refl | _
           = abort (x1≠x2 refl)
         fun x1 | Inl refl | Inr x≠x2 | Inl (_ , x1∈Γ)
