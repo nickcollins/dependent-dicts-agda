@@ -70,6 +70,11 @@ module Prelude where
                     → B y
   tr B refl x₁ = x₁
 
+  -- Agda is not smart and doesn't know that the normalization of an expression is equal to that
+  -- expression unless you beat it over the head with this divine wisdom -_-
+  expr-eq : {A : Set} (f : ⊤ → A) → Σ[ a ∈ A ] (a == f <>)
+  expr-eq f = f <> , refl
+
   -- options
   data Maybe (A : Set) : Set where
     Some : A → Maybe A
