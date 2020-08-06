@@ -169,11 +169,6 @@ module delta where
   ... | Inr (Inr x2<x1) | Inr (Inr x1<x2)
           = abort (<antisym x1<x2 x2<x1)
 
-  -- I'd say "God dammit agda" but AFAICT Coq is terrible about this as well
-  bad-lemma : {A : Set} (Γ' : A dlt) (a : A) (n m : Nat) →
-               Σ[ Γ ∈ A dlt ] (Γ == (n + 1+ m , a) :: Γ')
-  bad-lemma Γ' a n m = ((n + 1+ m , a) :: Γ') , refl
-
   sad-lemma : {A : Set} {Γ : A dlt} {x n : Nat} {a a' : A} →
                (x + 1+ n , a') ∈ ((n , a) :: Γ) →
                Σ[ x' ∈ Nat ] Σ[ Γ' ∈ A dlt ] (
@@ -432,7 +427,7 @@ module delta where
   dlt-elim {Γ = []}            = Inl refl
   dlt-elim {Γ = (n , a) :: []} = Inr (_ , _ , _ , refl , x#∅)
   dlt-elim {Γ = (n , a) :: ((m , a2) :: Γ'')}
-    with bad-lemma Γ'' a2 m n
+    with expr-eq (λ _ → (m + 1+ n , a2) :: Γ'')
   ... | Γ' , eq
     = Inr (n , a , Γ' , eqP , not-dom)
       where
