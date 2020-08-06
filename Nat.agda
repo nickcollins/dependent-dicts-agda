@@ -96,6 +96,18 @@ module Nat where
   +inj {a1} {a2} {1+ b} h
     rewrite n+1+m==1+n+m {a1} {b} | n+1+m==1+n+m {a2} {b} = +inj (1+inj h)
 
+  -- even/odd theorems
+
+  even-inj : ∀{m n} → m + m == n + n → m == n
+  even-inj {Z} {Z} eq = refl
+  even-inj {1+ m} {1+ n} eq rewrite (n+1+m==1+n+m {n} {n}) | (n+1+m==1+n+m {m} {m})
+    = 1+ap (even-inj (1+inj (1+inj eq)))
+
+  even-not-odd : ∀{m n} → 1+ (m + m) ≠ (n + n)
+  even-not-odd {Z} {1+ n} eq rewrite (n+1+m==1+n+m {n} {n}) = 0≠1+n (1+inj eq)
+  even-not-odd {1+ m} {1+ n} eq rewrite (n+1+m==1+n+m {n} {n}) | (n+1+m==1+n+m {m} {m})
+    = even-not-odd {m} {n} (1+inj (1+inj eq))
+
   -- _≤_ theorems
 
   0≤n : ∀{n} → Z ≤ n
