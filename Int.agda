@@ -19,9 +19,9 @@ module Int where
   int→nat:inj { -[1+ m ]} {+ n} eq = abort (even-not-odd {n} {m} (! eq))
   int→nat:inj { -[1+ m ]} { -[1+ n ]} eq rewrite even-inj {m} {n} eq = refl
 
-  int→nat:surj : ∀{n} → Σ[ m ∈ Int ] (int→nat m == n)
-  int→nat:surj {Z} = -[1+ Z ] , refl
-  int→nat:surj {1+ Z} = (+ Z) , refl
-  int→nat:surj {1+ (1+ n)} with int→nat:surj {n}
-  int→nat:surj {1+ (1+ .(1+ (n + n)))} | (+ n) , refl = (+ 1+ n) , 1+ap (1+ap n+1+m==1+n+m)
-  int→nat:surj {1+ (1+ .(n + n))} | -[1+ n ] , refl = -[1+ 1+ n ] , 1+ap n+1+m==1+n+m
+  int→nat:surj : (n : Nat) → Σ[ m ∈ Int ] (int→nat m == n)
+  int→nat:surj Z = -[1+ Z ] , refl
+  int→nat:surj (1+ Z) = (+ Z) , refl
+  int→nat:surj (1+ (1+ n)) with int→nat:surj n
+  int→nat:surj (1+ (1+ .(1+ (n + n)))) | (+ n) , refl = (+ 1+ n) , 1+ap (1+ap n+1+m==1+n+m)
+  int→nat:surj (1+ (1+ .(n + n))) | -[1+ n ] , refl = -[1+ 1+ n ] , 1+ap n+1+m==1+n+m
