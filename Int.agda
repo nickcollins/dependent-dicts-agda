@@ -1,5 +1,6 @@
 open import Prelude
 open import Nat
+open import Bij
 
 module Int where
 
@@ -25,3 +26,10 @@ module Int where
   int→nat:surj (1+ (1+ n)) with int→nat:surj n
   int→nat:surj (1+ (1+ .(1+ (n + n)))) | (+ n) , refl = (+ 1+ n) , 1+ap (1+ap n+1+m==1+n+m)
   int→nat:surj (1+ (1+ .(n + n))) | -[1+ n ] , refl = -[1+ 1+ n ] , 1+ap n+1+m==1+n+m
+
+  instance
+    IntBij : bij Int Nat
+    IntBij = record {
+      convert = int→nat;
+      inj     = int→nat:inj;
+      surj    = int→nat:surj}
