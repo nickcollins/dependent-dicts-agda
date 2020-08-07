@@ -24,7 +24,7 @@ open import List
 -- Agda's encapsulation facilities seem insufficient to properly encapsulate the
 -- raw data of a delta dictionary. Thus, we do not use encapsulation, but leave
 -- comments explaining that list functionality must not be used on a dlt
-module delta where
+module Delta where
   -- helper function
   diff-1 : ∀{n m} → n < m → Nat
   diff-1 n<m = difference (n<m→1+n≤m n<m)
