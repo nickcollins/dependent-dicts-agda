@@ -197,11 +197,15 @@ module List where
   ... | Inl i∈l1 = Inl i∈l1
   ... | Inr (j , |l1|+j=i , j∈l2) = Inr (_ , 1+ap |l1|+j=i , j∈l2)
 
-  -- map theorem
+  -- map theoremS
   map-++-comm : ∀{A B f a b} → map f a ++ map f b == map {A} {B} f (a ++ b)
   map-++-comm {a = []} = refl
   map-++-comm {A} {B} {f} {h :: t} {b} with map f (t ++ b) | map-++-comm {A} {B} {f} {t} {b}
   map-++-comm {A} {B} {f} {h :: t} {b} | _ | refl = refl
+
+  map^2 : ∀{A B C f g l} → map {B} {C} f (map {A} {B} g l) == map (f ⊙ g) l
+  map^2 {l = []} = refl
+  map^2 {f = f} {g} {h :: t} rewrite map^2 {f = f} {g} {t} = refl
 
   -- foldl theorem
   foldl-++ : {A B : Set} {l1 l2 : List A} {f : B → A → B} {b0 : B} →
