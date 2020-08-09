@@ -1,6 +1,7 @@
 open import Prelude
 open import Nat
 open import List
+open import Bij
 
 -- The contents of this file were originally written in a different codebase,
 -- which was itself a descendant of a prior codebase that had been using non-standard
@@ -21,12 +22,23 @@ open import List
 -- * TODO if we don't switch to truncation, we need to talk about subtraction
 -- * l⟦ i ⟧ is used to (maybe) get the ith element of list l
 -- * ∥ l ∥ is the length of a list
-module Delta where
+module Delta (Key : Set) {{bij : bij Key Nat}} where
   -- the 'abstract' keyword is buggy, so we can't use it, but ideally, the
   -- following line would be uncommented to ensure proper encapsulation
   -- abstract -- everything in the module is either abstract or private
 
     private
+      -- abbreviations for conversion between K and Nat
+      K : Nat → Key
+      K = convert-inv {{bij}}
+
+      N : Key → Nat
+      N = bij.convert bij
+
+      -- another bij-related convenience functions
+      inj-cp : ∀{k1 k2} → k1 ≠ k2 → N k1 ≠ N k2
+      inj-cp ne eq = abort (ne (bij.inj bij eq))
+
       -- helper function
       diff-1 : ∀{n m} → n < m → Nat
       diff-1 n<m = difference (n<m→1+n≤m n<m)
@@ -49,6 +61,19 @@ module Delta where
       ... | Inr (Inl refl) = (x , a) :: t
       ... | Inr (Inr hx<x) = (hx , ha) :: (t ,,' (diff-1 hx<x , a))
 
+      data _∈'_ : {A : Set} (p : Nat ∧ A) → (Γ : rt A) → Set where
+        InH : {A : Set} {Γ : rt A} {n : Nat} {a : A} →
+          (n , a) ∈' ((n , a) :: Γ)
+        InT : {A : Set} {Γ : rt A} {n s : Nat} {a a' : A} →
+          (n , a) ∈' Γ →
+          (n + 1+ s , a) ∈' ((s , a') :: Γ)
+
+      dom' : {A : Set} → rt A → Nat → Set
+      dom' {A} Γ n = Σ[ a ∈ A ] ((n , a) ∈' Γ)
+
+      _#'_ : {A : Set} (n : Nat) → (Γ : rt A) → Set
+      n #' Γ = dom' Γ n → ⊥
+
     ---- the core declarations ----
     -- TODO move definitions
 
@@ -60,30 +85,26 @@ module Delta where
     ∅ = TW []
 
     -- singleton
-    ■_ : {A : Set} → (Nat ∧ A) → t A
-    ■_ (x , a) = TW <| (x , a) :: []
+    ■_ : {A : Set} → (Key ∧ A) → t A
+    ■_ (k , a) = TW <| (N k , a) :: []
 
     -- extension/insertion
-    _,,_ : ∀{A} → t A → (Nat ∧ A) → t A
-    (TW Γ) ,, m = TW <| Γ ,,' m
+    _,,_ : ∀{A} → t A → (Key ∧ A) → t A
+    (TW Γ) ,, (k , a) = TW <| Γ ,,' (N k , a)
 
     infixl 10 _,,_
 
     -- membership
-    data _∈_ : {A : Set} (p : Nat ∧ A) → (Γ : t A) → Set where
-      InH : {A : Set} {Γ : rt A} {x : Nat} {a : A} →
-             (x , a) ∈ TW ((x , a) :: Γ)
-      InT : {A : Set} {Γ : rt A} {x s : Nat} {a a' : A} →
-             (x , a) ∈ TW Γ →
-             ((x + 1+ s , a)) ∈ TW ((s , a') :: Γ)
+    _∈_ : {A : Set} (p : Key ∧ A) → (Γ : t A) → Set
+    _∈_ {A} (k , a) (TW Γ) = _∈'_ {A} (N k , a) Γ
 
     -- domain
-    dom : {A : Set} → t A → Nat → Set
-    dom {A} Γ x = Σ[ a ∈ A ] ((x , a) ∈ Γ)
+    dom : {A : Set} → t A → Key → Set
+    dom {A} (TW Γ) k = dom' {A} Γ (N k)
 
     -- apartness, i.e. the opposite of dom
-    _#_ : {A : Set} (n : Nat) → (Γ : t A) → Set
-    x # Γ = dom Γ x → ⊥
+    _#_ : {A : Set} (k : Key) → (Γ : t A) → Set
+    k # (TW Γ) = (N k) #' Γ
 
     -- TODO theorems
     -- maps f across the values of the delta dict
@@ -96,24 +117,24 @@ module Delta where
 
     -- converts a list of key-value pairs into a delta dict, with later pairs in
     -- the list overriding bindings defined by previous pairs
-    list⇒dlt : {A : Set} → List (Nat ∧ A) → t A
+    list⇒dlt : {A : Set} → List (Key ∧ A) → t A
 
     -- converts a delta dict into a list of key-value pairs; the inverse of list⇒dlt
-    dlt⇒list : {A : Set} → t A → List (Nat ∧ A)
+    dlt⇒list : {A : Set} → t A → List (Key ∧ A)
 
     -- TODO theorems
     -- converts a list of key-value pairs into a multi-delta-dict, where each value of
     -- the result is the sublist of values from the former that were mapped to by the
     -- corresponding key
-    list⇒list-dlt : {A : Set} → List (Nat ∧ A) → t (List A)
+    list⇒list-dlt : {A : Set} → List (Key ∧ A) → t (List A)
 
     -- union merge A B is the union of A and B,
     -- with (merge a b) being invoked to handle the mappings they have in common
     union : {A : Set} → (A → A → A) → t A → t A → t A
 
     -- lookup function
-    _⦃⦃_⦄⦄ : {A : Set} → t A → Nat → Maybe A
-    (TW Γ) ⦃⦃ x ⦄⦄ = Γ lkup x
+    _⦃⦃_⦄⦄ : {A : Set} → t A → Key → Maybe A
+    (TW Γ) ⦃⦃ k ⦄⦄ = Γ lkup (N k)
 
     ||_|| : {A : Set} → t A → Nat
     || TW Γ || = ∥ Γ ∥
@@ -122,23 +143,17 @@ module Delta where
 
     private
 
-      unwrap' : {A : Set} → t A → rt A
-      unwrap' (TW Γ) = Γ
-
-      unwrap-eq' : {A : Set} {Γ1 Γ2 : rt A} → TW Γ1 == TW Γ2 → Γ1 == Γ2
-      unwrap-eq' refl = refl
-
-      unwrap-asym' : {A : Set} {Γ1 : t A} {Γ2 : rt A} → Γ1 == TW Γ2 → unwrap' Γ1 == Γ2
-      unwrap-asym' refl = refl
-
       undiff-1 : (x s : Nat) → (x<s+1+x : x < s + 1+ x) → s == diff-1 x<s+1+x
       undiff-1 x s x<s+1+x
         rewrite n+1+m==1+n+m {s} {x} | ! (m-n==1+m-1+n n≤m+n (n<m→1+n≤m x<s+1+x)) | +comm {s} {x}
           = ! (n+m-n==m n≤n+m)
 
+      x#'[] : {A : Set} {n : Nat} → _#'_ {A} n []
+      x#'[] (_ , ())
+
       too-small : {A : Set} {Γ : rt A} {xl xb : Nat} {a : A} →
                    xl < xb →
-                   dom (TW ((xb , a) :: Γ)) xl →
+                   dom' ((xb , a) :: Γ) xl →
                    ⊥
       too-small (_ , ne) (_ , InH) = ne refl
       too-small (x+1+xb≤xb , x+1+xb==xb) (_ , InT _) =
@@ -185,11 +200,11 @@ module Delta where
               = abort (<antisym x1<x2 x2<x1)
 
       sad-lemma : {A : Set} {Γ : rt A} {x n : Nat} {a a' : A} →
-                   (x + 1+ n , a') ∈ TW ((n , a) :: Γ) →
-                   Σ[ x' ∈ Nat ] Σ[ Γ' ∈ t A ] (
-                      Γ' == TW ((n , a) :: Γ) ∧
+                   (x + 1+ n , a') ∈' ((n , a) :: Γ) →
+                   Σ[ x' ∈ Nat ] Σ[ Γ' ∈ rt A ] (
+                      Γ' == ((n , a) :: Γ) ∧
                       x' == x + 1+ n ∧
-                      (x' , a') ∈ Γ')
+                      (x' , a') ∈' Γ')
       sad-lemma h = _ , _ , refl , refl , h
 
       lemma-math' : ∀{x x1 n} → x ≠ x1 + (n + 1+ x)
@@ -199,122 +214,87 @@ module Delta where
               | +comm {1+ x1 + n} {x}
           = n≠n+1+m
 
-      lookup-cons-1' : (A : Set) (Γ : rt A) (x : Nat) (a : A) → Γ lkup x == Some a → (x , a) ∈ TW Γ
-      lookup-cons-1' _ [] _ _ ()
-      lookup-cons-1' _ ((hx , ha) :: t) x _ h
+      lookup-cons-1' : {A : Set} {Γ : rt A} {x : Nat} {a : A} → Γ lkup x == Some a → (x , a) ∈' Γ
+      lookup-cons-1' {Γ = []} ()
+      lookup-cons-1' {Γ = ((hx , ha) :: t)} {x} h
         with <dec x hx
-      lookup-cons-1' _ ((hx , ha) :: t) x _ ()     | Inl _
-      lookup-cons-1' _ ((hx , ha) :: t) .hx _ refl | Inr (Inl refl) = InH
-      lookup-cons-1' _ ((hx , ha) :: t) x a h      | Inr (Inr hx<x)
+      lookup-cons-1' {Γ = ((hx , ha) :: t)} {x} ()     | Inl _
+      lookup-cons-1' {Γ = ((hx , ha) :: t)} {.hx} refl | Inr (Inl refl) = InH
+      lookup-cons-1' {Γ = ((hx , ha) :: t)} {x} {a} h  | Inr (Inr hx<x)
         = tr
-            (λ y → (y , a) ∈ TW ((hx , ha) :: t))
+            (λ y → (y , a) ∈' ((hx , ha) :: t))
             (m-n+n==m (n<m→1+n≤m hx<x))
-            (InT (lookup-cons-1' _ t _ _ h))
+            (InT (lookup-cons-1' {Γ = t} h))
 
-      x,a∈Γ,,x,a' : (A : Set) (Γ : rt A) (x : Nat) (a : A) → (x , a) ∈ (TW Γ ,, (x , a))
-      x,a∈Γ,,x,a' _ [] x a = InH
-      x,a∈Γ,,x,a' _ ((hx , ha) :: t) x a
+      lookup-cons-2' : {A : Set} {Γ : rt A} {n : Nat} {a : A} →
+                        (n , a) ∈' Γ →
+                        Γ lkup n == Some a
+      lookup-cons-2' {n = x} InH rewrite <dec-refl x = refl
+      lookup-cons-2' (InT {Γ = Γ} {n = x} {s} {a} x∈Γ)
+        with <dec (x + 1+ s) s
+      ... | Inl x+1+s<s        = abort (<antisym x+1+s<s (n<m→n<s+m n<1+n))
+      ... | Inr (Inl x+1+s==s) = abort ((flip n≠n+1+m) (n+1+m==1+n+m · (+comm {1+ s} · x+1+s==s)))
+      ... | Inr (Inr s<x+1+s)
+        with lookup-cons-2' x∈Γ
+      ... | h rewrite ! (undiff-1 s x s<x+1+s) = h
+
+      x,v∈'Γ,,x,v : {A : Set} {Γ : rt A} {x : Nat} {a : A} → (x , a) ∈' (Γ ,,' (x , a))
+      x,v∈'Γ,,x,v {Γ = []} {x} {a} = InH
+      x,v∈'Γ,,x,v {Γ = ((hx , ha) :: t)} {x} {a}
         with <dec x hx
       ... | Inl _          = InH
       ... | Inr (Inl refl) = InH
       ... | Inr (Inr hx<x) =
               tr
-                (λ y → (y , a) ∈ TW ((hx , ha) :: (t ,,' (diff-1 hx<x , a))))
+                (λ y → (y , a) ∈' ((hx , ha) :: (t ,,' (diff-1 hx<x , a))))
                 (m-n+n==m (n<m→1+n≤m hx<x))
-                (InT (x,a∈Γ,,x,a' _ t (diff-1 hx<x) a))
+                (InT (x,v∈'Γ,,x,v {Γ = t} {diff-1 hx<x}))
 
-    ---- core theorems ----
-
-    -- lookup is decidable
-    lookup-dec : {A : Set} (Γ : t A) (x : Nat) →
-                  Σ[ a ∈ A ] (Γ ⦃⦃ x ⦄⦄ == Some a) ∨ Γ ⦃⦃ x ⦄⦄ == None
-    lookup-dec Γ x
-      with Γ ⦃⦃ x ⦄⦄
-    ... | Some a = Inl (a , refl)
-    ... | None   = Inr refl
-
-    -- The next two theorems show that lookup (_⦃⦃_⦄⦄) is consistent with membership (_∈_)
-    lookup-cons-1 : {A : Set} {Γ : t A} {x : Nat} {a : A} →
-                     Γ ⦃⦃ x ⦄⦄ == Some a →
-                     (x , a) ∈ Γ
-    lookup-cons-1 {A} {TW Γ} {x} {a} h = lookup-cons-1' A Γ x a h
-
-    lookup-cons-2 : {A : Set} {Γ : t A} {x : Nat} {a : A} →
-                     (x , a) ∈ Γ →
-                     Γ ⦃⦃ x ⦄⦄ == Some a
-    lookup-cons-2 {x = x} InH rewrite <dec-refl x = refl
-    lookup-cons-2 (InT {Γ = Γ} {x = x} {s} {a} x∈Γ)
-      with <dec (x + 1+ s) s
-    ... | Inl x+1+s<s        = abort (<antisym x+1+s<s (n<m→n<s+m n<1+n))
-    ... | Inr (Inl x+1+s==s) = abort ((flip n≠n+1+m) (n+1+m==1+n+m · (+comm {1+ s} · x+1+s==s)))
-    ... | Inr (Inr s<x+1+s)
-      with lookup-cons-2 x∈Γ
-    ... | h rewrite ! (undiff-1 s x s<x+1+s) = h
-
-    -- membership (_∈_) respects insertion (_,,_)
-    x,a∈Γ,,x,a : {A : Set} {Γ : t A} {x : Nat} {a : A} →
-                  (x , a) ∈ (Γ ,, (x , a))
-    x,a∈Γ,,x,a {A} {Γ = TW Γ} {x} {a} = x,a∈Γ,,x,a' A Γ x a
-
-    -- insertion can't generate spurious membership
-    x∈Γ+→x∈Γ : {A : Set} {Γ : t A} {x x' : Nat} {a a' : A} →
-                  x ≠ x' →
-                  (x , a) ∈ (Γ ,, (x' , a')) →
-                  (x , a) ∈ Γ
-    x∈Γ+→x∈Γ {A} {Γ = TW Γ} {x} {x'} {a} {a'} ne h = x∈Γ+→x∈Γ' {A} {Γ} {x} {x'} {a} {a'} ne h
-      where
-      x∈Γ+→x∈Γ' : {A : Set} {Γ : rt A} {x x' : Nat} {a a' : A} →
+      x∈Γ+→'x∈Γ : {A : Set} {Γ : rt A} {x x' : Nat} {a a' : A} →
                     x ≠ x' →
-                    (x , a) ∈ (TW Γ ,, (x' , a')) →
-                    (x , a) ∈ TW Γ
-      x∈Γ+→x∈Γ' {Γ = []} x≠x' InH = abort (x≠x' refl)
-      x∈Γ+→x∈Γ' {Γ = []} x≠x' (InT ())
-      x∈Γ+→x∈Γ' {Γ = (hx , ha) :: t} {x' = x'} x≠x' x∈Γ+
+                    (x , a) ∈' (Γ ,,' (x' , a')) →
+                    (x , a) ∈' Γ
+      x∈Γ+→'x∈Γ {Γ = []} x≠x' InH = abort (x≠x' refl)
+      x∈Γ+→'x∈Γ {Γ = []} x≠x' (InT ())
+      x∈Γ+→'x∈Γ {Γ = (hx , ha) :: t} {x' = x'} x≠x' x∈Γ+
         with <dec x' hx
-      x∈Γ+→x∈Γ' {_} {(hx , ha) :: t} {x' = x'} x≠x' InH | Inl x'<hx = abort (x≠x' refl)
-      x∈Γ+→x∈Γ' {_} {(hx , ha) :: t} {x' = x'} x≠x' (InT InH) | Inl x'<hx
+      x∈Γ+→'x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' InH | Inl x'<hx = abort (x≠x' refl)
+      x∈Γ+→'x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' (InT InH) | Inl x'<hx
         rewrite m-n+n==m (n<m→1+n≤m x'<hx) = InH
-      x∈Γ+→x∈Γ' {_} {(hx , ha) :: t} {x' = x'} x≠x' (InT (InT {x = x} x∈Γ+)) | Inl x'<hx
+      x∈Γ+→'x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' (InT (InT {n = x} x∈Γ+)) | Inl x'<hx
         rewrite +assc {x} {1+ (diff-1 x'<hx)} {1+ x'} | m-n+n==m (n<m→1+n≤m x'<hx)
           = InT x∈Γ+
-      x∈Γ+→x∈Γ' {_} {(hx , ha) :: t} {x' = .hx} x≠x' InH | Inr (Inl refl) = abort (x≠x' refl)
-      x∈Γ+→x∈Γ' {_} {(hx , ha) :: t} {x' = .hx} x≠x' (InT x∈Γ+) | Inr (Inl refl) = InT x∈Γ+
-      x∈Γ+→x∈Γ' {_} {(hx , ha) :: t} {x' = x'} x≠x' InH | Inr (Inr hx<x') = InH
-      x∈Γ+→x∈Γ' {_} {(hx , ha) :: t} {x' = x'} x≠x' (InT x∈Γ+) | Inr (Inr hx<x')
-        = InT (x∈Γ+→x∈Γ (λ where refl → x≠x' (m-n+n==m (n<m→1+n≤m hx<x'))) x∈Γ+)
+      x∈Γ+→'x∈Γ {_} {(hx , ha) :: t} {x' = .hx} x≠x' InH | Inr (Inl refl) = abort (x≠x' refl)
+      x∈Γ+→'x∈Γ {_} {(hx , ha) :: t} {x' = .hx} x≠x' (InT x∈Γ+) | Inr (Inl refl) = InT x∈Γ+
+      x∈Γ+→'x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' InH | Inr (Inr hx<x') = InH
+      x∈Γ+→'x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' (InT x∈Γ+) | Inr (Inr hx<x')
+        = InT (x∈Γ+→'x∈Γ (λ where refl → x≠x' (m-n+n==m (n<m→1+n≤m hx<x'))) x∈Γ+)
 
-    -- insertion respects membership
-    x∈Γ→x∈Γ+ : {A : Set} {Γ : t A} {x x' : Nat} {a a' : A} →
-                  x ≠ x' →
-                  (x , a) ∈ Γ →
-                  (x , a) ∈ (Γ ,, (x' , a'))
-    x∈Γ→x∈Γ+ {x = x} {x'} {a} {a'} x≠x' (InH {Γ = Γ'})
-      with <dec x' x
-    ... | Inl x'<x
-            = tr
-                (λ y → (y , a) ∈ TW ((x' , a') :: ((diff-1 x'<x , a) :: Γ')))
-                (m-n+n==m (n<m→1+n≤m x'<x))
-                (InT InH)
-    ... | Inr (Inl refl) = abort (x≠x' refl)
-    ... | Inr (Inr x<x') = InH
-    x∈Γ→x∈Γ+ {x = .(_ + 1+ _)} {x'} {a} {a'} x≠x' (InT {Γ = Γ} {x} {s} {a' = a''} x∈Γ)
-      with <dec x' s
-    ... | Inl x'<s
-            = tr
-                (λ y → (y , a) ∈ TW ((x' , a') :: ((diff-1 x'<s , a'') :: Γ)))
-                ((+assc {b = 1+ (diff-1 x'<s)}) · (ap1 (_+_ x) (1+ap (m-n+n==m (n<m→1+n≤m x'<s)))))
-                (InT (InT x∈Γ))
-    ... | Inr (Inl refl) = InT x∈Γ
-    ... | Inr (Inr s<x') =
-            InT (x∈Γ→x∈Γ+ (λ where refl → x≠x' (m-n+n==m (n<m→1+n≤m s<x'))) x∈Γ)
+      x∈Γ→'x∈Γ+ : {A : Set} {Γ : rt A} {x x' : Nat} {a a' : A} →
+                   x ≠ x' →
+                   (x , a) ∈' Γ →
+                   (x , a) ∈' (Γ ,,' (x' , a'))
+      x∈Γ→'x∈Γ+ {x = x} {x'} {a} {a'} x≠x' (InH {Γ = Γ'})
+        with <dec x' x
+      ... | Inl x'<x
+        = tr
+            (λ y → (y , a) ∈' ((x' , a') :: ((diff-1 x'<x , a) :: Γ')))
+            (m-n+n==m (n<m→1+n≤m x'<x))
+            (InT InH)
+      ... | Inr (Inl refl) = abort (x≠x' refl)
+      ... | Inr (Inr x<x') = InH
+      x∈Γ→'x∈Γ+ {x = .(_ + 1+ _)} {x'} {a} {a'} x≠x' (InT {Γ = Γ} {x} {s} {a' = a''} x∈Γ)
+        with <dec x' s
+      ... | Inl x'<s
+        = tr
+            (λ y → (y , a) ∈' ((x' , a') :: ((diff-1 x'<s , a'') :: Γ)))
+            ((+assc {b = 1+ (diff-1 x'<s)}) · (ap1 (_+_ x) (1+ap (m-n+n==m (n<m→1+n≤m x'<s)))))
+            (InT (InT x∈Γ))
+      ... | Inr (Inl refl) = InT x∈Γ
+      ... | Inr (Inr s<x') =
+              InT (x∈Γ→'x∈Γ+ (λ where refl → x≠x' (m-n+n==m (n<m→1+n≤m s<x'))) x∈Γ)
 
-    -- Decidability of membership
-    -- This also packages up an appeal to delta dict membership into a form that
-    -- lets us retain more information
-    dltindirect : {A : Set} (Γ : t A) (x : Nat) → dom Γ x ∨ x # Γ
-    dltindirect {A} (TW Γ) x = dltindirect' {A} Γ x
-      where
-      dltindirect' : {A : Set} (Γ : rt A) (x : Nat) → dom (TW Γ) x ∨ x # (TW Γ)
+      dltindirect' : {A : Set} (Γ : rt A) (x : Nat) → dom' Γ x ∨ x #' Γ
       dltindirect' [] x = Inr (λ ())
       dltindirect' ((hx , ha) :: t) x
         with <dec x hx
@@ -324,69 +304,192 @@ module Delta where
         with dltindirect' t (diff-1 hx<x)
       dltindirect' ((hx , ha) :: t) x | Inr (Inr hx<x) | Inl (a , rec) =
         Inl (a , tr
-                   (λ y → (y , a) ∈ TW ((hx , ha) :: t))
+                   (λ y → (y , a) ∈' ((hx , ha) :: t))
                    (m-n+n==m (n<m→1+n≤m hx<x))
                    (InT rec))
       dltindirect' {A} ((hx , ha) :: t) x | Inr (Inr hx<x) | Inr dne =
         Inr x∉Γ
-        where
-          x∉Γ : Σ[ a ∈ A ] ((x , a) ∈ TW ((hx , ha) :: t)) → ⊥
+          where
+          x∉Γ : Σ[ a ∈ A ] ((x , a) ∈' ((hx , ha) :: t)) → ⊥
           x∉Γ (_ , x∈Γ) with x∈Γ
           ... | InH = (π2 hx<x) refl
-          ... | InT {x = s} x-hx-1∈t
+          ... | InT {n = s} x-hx-1∈t
             rewrite ! (undiff-1 hx s hx<x) = dne (_ , x-hx-1∈t)
 
+      dlt-==-eqv' : {A : Set} {Γ1 Γ2 : rt A} →
+                     ((x : Nat) → Γ1 lkup x == Γ2 lkup x) →
+                     Γ1 == Γ2
+      dlt-==-eqv' {Γ1 = []} {[]} all-bindings-== = refl
+      dlt-==-eqv' {Γ1 = []} {(hx2 , ha2) :: t2} all-bindings-==
+        = abort (all-not-none {Γ = t2} {x = hx2} (all-bindings-== hx2))
+      dlt-==-eqv' {Γ1 = (hx1 , ha1) :: t1} {[]} all-bindings-==
+        = abort (all-not-none {Γ = t1} {x = hx1} (! (all-bindings-== hx1)))
+      dlt-==-eqv' {Γ1 = (hx1 , ha1) :: t1} {(hx2 , ha2) :: t2} all-bindings-==
+        rewrite dlt-==-eqv' {Γ1 = t1} {t2} (all-bindings-==-rec all-bindings-==)
+        with all-bindings-== hx1 | all-bindings-== hx2
+      ... | ha1== | ha2== rewrite <dec-refl hx1 | <dec-refl hx2
+        with <dec hx1 hx2 | <dec hx2 hx1
+      ... | Inl hx1<hx2 | _
+              = abort (somenotnone ha1==)
+      ... | Inr (Inl refl) | Inl hx2<hx1
+              = abort (somenotnone (! ha2==))
+      ... | Inr (Inr hx2<hx1) | Inl hx2<'hx1
+              = abort (somenotnone (! ha2==))
+      ... | Inr (Inl refl) | Inr _
+              rewrite someinj ha1== = refl
+      ... | Inr (Inr hx2<hx1) | Inr (Inl refl)
+              rewrite someinj ha2== = refl
+      ... | Inr (Inr hx2<hx1) | Inr (Inr hx1<hx2)
+              = abort (<antisym hx1<hx2 hx2<hx1)
+
+      dlt-delete' : {A : Set} {Γ : rt A} {n : Nat} {a : A} →
+                     (n , a) ∈' Γ →
+                     Σ[ Γ⁻ ∈ rt A ] (
+                        Γ == Γ⁻ ,,' (n , a) ∧
+                        n #' Γ⁻)
+      dlt-delete' {Γ = (n' , a') :: Γ} {n} n∈Γ
+        with <dec n n'
+      ... | Inl n<n'       = abort (too-small n<n' (_ , n∈Γ))
+      dlt-delete' {_} {(n' , a') :: []} {.n'} InH                 | Inr (Inl _) = [] , refl , λ ()
+      dlt-delete' {_} {(n' , a') :: ((n'' , a'') :: Γ)} {.n'} InH | Inr (Inl _)
+        = ((n'' + 1+ n' , a'') :: Γ) , lem , λ {(_ , n'∈Γ+) → abort (too-small (n<m→n<s+m n<1+n) (_ , n'∈Γ+))}
+          where
+            lem : ((n' , a') :: ((n'' , a'') :: Γ)) == ((n'' + 1+ n' , a'') :: Γ) ,,' (n' , a')
+            lem
+              with <dec n' (n'' + 1+ n')
+            lem | Inl n'<n''+1+n' rewrite ! (undiff-1 n' n'' n'<n''+1+n') = refl
+            lem | Inr (Inl false) = abort (lemma-math' {x1 = Z} false)
+            lem | Inr (Inr false) = abort (<antisym false (n<m→n<s+m n<1+n))
+      dlt-delete' {Γ = (n' , a') :: Γ} InH       | Inr (Inr n'<n') = abort (<antirefl n'<n')
+      dlt-delete' {Γ = (n' , a') :: Γ} (InT n∈Γ) | Inr _
+        with dlt-delete' {Γ = Γ} n∈Γ
+      dlt-delete' {Γ = (n' , a') :: Γ} {.(_ + 1+ n')} {a} (InT {n = x} n∈Γ) | Inr _ | Γ⁻ , refl , x#Γ⁻
+        = _ , lem' , lem
+          where
+            lem : (x + 1+ n') #' ((n' , a') :: Γ⁻)
+            lem (_ , x+1+n'∈Γ?)
+              with sad-lemma x+1+n'∈Γ?
+            ... | _ , _ , refl , x'==x+1+n' , InH = abort (lemma-math' {x1 = Z} x'==x+1+n')
+            ... | _ , _ , refl , x'==x+1+n' , InT {n = x'} x+1+n'∈Γ'
+              rewrite +inj {b = 1+ n'} x'==x+1+n'
+                = x#Γ⁻ (_ , x+1+n'∈Γ')
+            lem' : ((n' , a') :: (Γ⁻ ,,' (x , a))) == (((n' , a') :: Γ⁻) ,,' (x + 1+ n' , a))
+            lem'
+              with <dec (x + 1+ n') n'
+            lem' | Inl x+1+n'<n'       = abort (<antisym x+1+n'<n' (n<m→n<s+m n<1+n))
+            lem' | Inr (Inl false)     = abort (lemma-math' {x1 = Z} (! false))
+            lem' | Inr (Inr n'<x+1+n') rewrite ! (undiff-1 n' x n'<x+1+n') = refl
+
+      dlt-elim' : {A : Set} {Γ : rt A} →
+                   Γ == []
+                      ∨
+                   Σ[ n ∈ Nat ] Σ[ a ∈ A ] Σ[ Γ' ∈ rt A ]
+                      (Γ == Γ' ,,' (n , a) ∧ n #' Γ')
+      dlt-elim' {Γ = []}              = Inl refl
+      dlt-elim' {Γ = ((n , a) :: [])} = Inr (_ , _ , _ , refl , x#'[])
+      dlt-elim' {Γ = ((n , a) :: ((m , a2) :: Γ''))}
+        with expr-eq (λ _ → (m + 1+ n , a2) :: Γ'')
+      ... | Γ' , eq
+        = Inr (n , a , Γ' , eqP , not-dom)
+          where
+          eqP : ((n , a) :: ((m , a2) :: Γ'')) == Γ' ,,' (n , a)
+          eqP rewrite eq with <dec n (m + 1+ n)
+          ... | Inl n<m+1+n
+            rewrite ! (undiff-1 n m n<m+1+n) = refl
+          ... | Inr (Inl n==m+1+n)
+                  = abort (n≠n+1+m (n==m+1+n · (n+1+m==1+n+m · +comm {1+ m})))
+          ... | Inr (Inr m+1+n<n)
+                  = abort (<antisym m+1+n<n (n<m→n<s+m n<1+n))
+          not-dom : dom' Γ' n → ⊥
+          not-dom rewrite eq = λ n∈Γ' → too-small (n<m→n<s+m n<1+n) n∈Γ'
+
+      dlt-decreasing' : {A : Set} {Γ : rt A} {n : Nat} {a : A} →
+                         n #' Γ →
+                         ∥ Γ ,,' (n , a) ∥ == 1+ ∥ Γ ∥
+      dlt-decreasing' {Γ = []} n#Γ = refl
+      dlt-decreasing' {Γ = (n' , a') :: Γ} {n} n#Γ
+        with <dec n n'
+      ... | Inl n<n'       = refl
+      ... | Inr (Inl refl) = abort (n#Γ (_ , InH))
+      ... | Inr (Inr n'<n)
+              = 1+ap (dlt-decreasing' λ {(a , diff∈Γ) →
+                  n#Γ (a , tr
+                             (λ y → (y , a) ∈' ((n' , a') :: Γ))
+                             (m-n+n==m (n<m→1+n≤m n'<n))
+                             (InT diff∈Γ))})
+
+    ---- core theorems ----
+
+    -- The next two theorems show that lookup (_⦃⦃_⦄⦄) is consistent with membership (_∈_)
+    lookup-cons-1 : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                     Γ ⦃⦃ k ⦄⦄ == Some a →
+                     (k , a) ∈ Γ
+    lookup-cons-1 {A} {TW Γ} {k} {a} h = lookup-cons-1' {Γ = Γ} {N k} h
+
+    lookup-cons-2 : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                     (k , a) ∈ Γ →
+                     Γ ⦃⦃ k ⦄⦄ == Some a
+    lookup-cons-2 {A} {TW Γ} {k} {a} = lookup-cons-2' {A} {Γ} {N k} {a}
+
+    -- membership (_∈_) respects insertion (_,,_)
+    k,v∈Γ,,k,v : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                  (k , a) ∈ (Γ ,, (k , a))
+    k,v∈Γ,,k,v {A} {Γ = TW Γ} {k} = x,v∈'Γ,,x,v {Γ = Γ} {N k}
+
+    -- insertion can't generate spurious membership
+    k∈Γ+→k∈Γ : {A : Set} {Γ : t A} {k k' : Key} {a a' : A} →
+                 k ≠ k' →
+                 (k , a) ∈ (Γ ,, (k' , a')) →
+                 (k , a) ∈ Γ
+    k∈Γ+→k∈Γ {A} {Γ = TW Γ} {k} {k'} {a} {a'} ne h
+      = x∈Γ+→'x∈Γ {A} {Γ} {N k} {N k'} {a} {a'} (inj-cp ne) h
+
+    -- insertion respects membership
+    k∈Γ→k∈Γ+ : {A : Set} {Γ : t A} {k k' : Key} {a a' : A} →
+                 k ≠ k' →
+                 (k , a) ∈ Γ →
+                 (k , a) ∈ (Γ ,, (k' , a'))
+    k∈Γ→k∈Γ+ {A} {TW Γ} {k} {k'} {a} {a'} ne h
+      = x∈Γ→'x∈Γ+ {A} {Γ} {N k} {N k'} {a} {a'} (inj-cp ne) h
+
+    -- Decidability of membership
+    -- This also packages up an appeal to delta dict membership into a form that
+    -- lets us retain more information
+    dltindirect : {A : Set} (Γ : t A) (k : Key) → dom Γ k ∨ k # Γ
+    dltindirect {A} (TW Γ) k = dltindirect' {A} Γ (N k)
+
     -- delta dicts give at most one binding for each variable
-    dltunicity : {A : Set} {Γ : t A} {x : Nat} {a a' : A} →
-                   (x , a) ∈ Γ →
-                   (x , a') ∈ Γ →
+    dltunicity : {A : Set} {Γ : t A} {k : Key} {a a' : A} →
+                   (k , a) ∈ Γ →
+                   (k , a') ∈ Γ →
                    a == a'
     dltunicity ah a'h
       with lookup-cons-2 ah | lookup-cons-2 a'h
     ... | ah' | a'h' = someinj (! ah' · a'h')
 
     -- nothing is in nil
-    x#∅ : {A : Set} {x : Nat} → _#_ {A} x ∅
-    x#∅ (_ , ())
+    k#∅ : {A : Set} {k : Key} → _#_ {A} k ∅
+    k#∅ (_ , ())
 
     -- meaning of the singleton
-    ■-def : {A : Set} {n : Nat} {a : A} → (■ (n , a)) == ∅ ,, (n , a)
+    ■-def : {A : Set} {k : Key} {a : A} → (■ (k , a)) == ∅ ,, (k , a)
     ■-def = refl
 
     -- extensionality of Delta dicts
     -- (i.e. if two dicts represent the same mapping from ids to values,
     -- then they are reflexively equal as judged by _==_)
     dlt-==-eqv : {A : Set} {Γ1 Γ2 : t A} →
-                  ((x : Nat) → Γ1 ⦃⦃ x ⦄⦄ == Γ2 ⦃⦃ x ⦄⦄) →
+                  ((k : Key) → Γ1 ⦃⦃ k ⦄⦄ == Γ2 ⦃⦃ k ⦄⦄) →
                   Γ1 == Γ2
     dlt-==-eqv {A} {TW Γ1} {TW Γ2} all-bindings-==
-      = ap1 TW <| dlt-==-eqv' {A} {Γ1} {Γ2} all-bindings-==
+      = ap1 TW <| dlt-==-eqv' {A} {Γ1} {Γ2} eqv-nat
         where
-        dlt-==-eqv' : {A : Set} {Γ1 Γ2 : rt A} →
-                       ((x : Nat) → Γ1 lkup x == Γ2 lkup x) →
-                       Γ1 == Γ2
-        dlt-==-eqv' {Γ1 = []} {[]} all-bindings-== = refl
-        dlt-==-eqv' {Γ1 = []} {(hx2 , ha2) :: t2} all-bindings-==
-          = abort (all-not-none {Γ = t2} {x = hx2} (all-bindings-== hx2))
-        dlt-==-eqv' {Γ1 = (hx1 , ha1) :: t1} {[]} all-bindings-==
-          = abort (all-not-none {Γ = t1} {x = hx1} (! (all-bindings-== hx1)))
-        dlt-==-eqv' {Γ1 = (hx1 , ha1) :: t1} {(hx2 , ha2) :: t2} all-bindings-==
-          rewrite dlt-==-eqv' {Γ1 = t1} {t2} (all-bindings-==-rec all-bindings-==)
-          with all-bindings-== hx1 | all-bindings-== hx2
-        ... | ha1== | ha2== rewrite <dec-refl hx1 | <dec-refl hx2
-          with <dec hx1 hx2 | <dec hx2 hx1
-        ... | Inl hx1<hx2 | _
-                = abort (somenotnone ha1==)
-        ... | Inr (Inl refl) | Inl hx2<hx1
-                = abort (somenotnone (! ha2==))
-        ... | Inr (Inr hx2<hx1) | Inl hx2<'hx1
-                = abort (somenotnone (! ha2==))
-        ... | Inr (Inl refl) | Inr _
-                rewrite someinj ha1== = refl
-        ... | Inr (Inr hx2<hx1) | Inr (Inl refl)
-                rewrite someinj ha2== = refl
-        ... | Inr (Inr hx2<hx1) | Inr (Inr hx1<hx2)
-                = abort (<antisym hx1<hx2 hx2<hx1)
+        eqv-nat : (n : Nat) → (Γ1 lkup n) == (Γ2 lkup n)
+        eqv-nat n
+          with bij.surj bij n
+        ... | k , surj
+          with all-bindings-== k
+        ... | eq rewrite surj = eq
 
     -- decidable equality of delta dicts
     dlt-==-dec : {A : Set}
@@ -410,105 +513,48 @@ module Delta where
       ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
 
     -- A useful way to destruct delta dict membership
-    dlt-split : {A : Set} {Γ : t A} {n m : Nat} {an am : A} →
-                  (n , an) ∈ (Γ ,, (m , am)) →
-                  (n ≠ m ∧ (n , an) ∈ Γ) ∨ (n == m ∧ an == am)
-    dlt-split {Γ = Γ} {n} {m} {an} {am} n∈Γ+
-      with natEQ n m
-    ... | Inl refl = Inr (refl , dltunicity n∈Γ+ (x,a∈Γ,,x,a {Γ = Γ}))
-    ... | Inr n≠m  = Inl (n≠m , x∈Γ+→x∈Γ n≠m n∈Γ+)
+    dlt-split : {A : Set} {Γ : t A} {k1 k2 : Key} {a1 a2 : A} →
+                  (k1 , a1) ∈ (Γ ,, (k2 , a2)) →
+                  (k1 ≠ k2 ∧ (k1 , a1) ∈ Γ) ∨ (k1 == k2 ∧ a1 == a2)
+    dlt-split {Γ = Γ} {k1} {k2} {a1} {a2} n∈Γ+
+    --  with expr-eq (λ _ → N k1) | expr-eq (λ _ → N k2)
+    --... | n1 , refl | n2 , refl = {!!}
+      with natEQ (N k1) (N k2)
+    ... | Inl eq
+      rewrite bij.inj bij eq
+        = Inr (refl , dltunicity n∈Γ+ (k,v∈Γ,,k,v {Γ = Γ}))
+    ... | Inr ne = Inl (ne' , k∈Γ+→k∈Γ ne' n∈Γ+)
+            where
+            ne' = λ eq → abort (ne (ap1 N eq))
 
     -- remove a specific mapping from a delta dict
-    dlt-delete : {A : Set} {Γ : t A} {n : Nat} {a : A} →
-                  (n , a) ∈ Γ →
+    dlt-delete : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                  (k , a) ∈ Γ →
                   Σ[ Γ⁻ ∈ t A ] (
-                     Γ == Γ⁻ ,, (n , a) ∧
-                     n # Γ⁻)
-    dlt-delete {A} {TW Γ} {n} {a} h = dlt-delete' {A} {Γ} {n} {a} h
-      where
-      dlt-delete' : {A : Set} {Γ : rt A} {n : Nat} {a : A} →
-                     (n , a) ∈ TW Γ →
-                     Σ[ Γ⁻ ∈ t A ] (
-                        TW Γ == Γ⁻ ,, (n , a) ∧
-                        n # Γ⁻)
-      dlt-delete' {Γ = (n' , a') :: Γ} {n} n∈Γ
-        with <dec n n'
-      ... | Inl n<n'       = abort (too-small n<n' (_ , n∈Γ))
-      dlt-delete' {_} {(n' , a') :: []} {.n'} InH                 | Inr (Inl _) = ∅ , refl , λ ()
-      dlt-delete' {_} {(n' , a') :: ((n'' , a'') :: Γ)} {.n'} InH | Inr (Inl _)
-        = TW ((n'' + 1+ n' , a'') :: Γ) , lem , λ {(_ , n'∈Γ+) → abort (too-small (n<m→n<s+m n<1+n) (_ , n'∈Γ+))}
-          where
-            lem : TW ((n' , a') :: ((n'' , a'') :: Γ)) == TW ((n'' + 1+ n' , a'') :: Γ) ,, (n' , a')
-            lem
-              with <dec n' (n'' + 1+ n')
-            lem | Inl n'<n''+1+n' rewrite ! (undiff-1 n' n'' n'<n''+1+n') = refl
-            lem | Inr (Inl false) = abort (lemma-math' {x1 = Z} false)
-            lem | Inr (Inr false) = abort (<antisym false (n<m→n<s+m n<1+n))
-      dlt-delete' {Γ = (n' , a') :: Γ} InH       | Inr (Inr n'<n') = abort (<antirefl n'<n')
-      dlt-delete' {Γ = (n' , a') :: Γ} (InT n∈Γ) | Inr _
-        with dlt-delete' {Γ = Γ} n∈Γ
-      dlt-delete' {Γ = (n' , a') :: Γ} {.(_ + 1+ n')} {a} (InT {x = x} n∈Γ) | Inr _ | TW Γ⁻ , refl , x#Γ⁻
-        = _ , lem' , lem
-          where
-            lem : (x + 1+ n') # TW ((n' , a') :: Γ⁻)
-            lem (_ , x+1+n'∈Γ?)
-              with sad-lemma x+1+n'∈Γ?
-            ... | _ , _ , refl , x'==x+1+n' , InH = abort (lemma-math' {x1 = Z} x'==x+1+n')
-            ... | _ , _ , refl , x'==x+1+n' , InT {x = x'} x+1+n'∈Γ'
-              rewrite +inj {b = 1+ n'} x'==x+1+n'
-                = x#Γ⁻ (_ , x+1+n'∈Γ')
-            lem' : TW ((n' , a') :: (Γ⁻ ,,' (x , a))) == TW (((n' , a') :: Γ⁻) ,,' (x + 1+ n' , a))
-            lem'
-              with <dec (x + 1+ n') n'
-            lem' | Inl x+1+n'<n'       = abort (<antisym x+1+n'<n' (n<m→n<s+m n<1+n))
-            lem' | Inr (Inl false)     = abort (lemma-math' {x1 = Z} (! false))
-            lem' | Inr (Inr n'<x+1+n') rewrite ! (undiff-1 n' x n'<x+1+n') = refl
+                     Γ == Γ⁻ ,, (k , a) ∧
+                     k # Γ⁻)
+    dlt-delete {A} {TW Γ} {k} {a} h
+      with dlt-delete' {A} {Γ} {N k} {a} h
+    ... | _ , refl , # = _ , refl , #
 
     -- Allows the delta dicts to be destructed, by removing an arbitrary item
     dlt-elim : {A : Set} {Γ : t A} →
                 Γ == ∅
                   ∨
-                Σ[ n ∈ Nat ] Σ[ a ∈ A ] Σ[ Γ' ∈ t A ]
-                   (Γ == Γ' ,, (n , a) ∧ n # Γ')
-    dlt-elim {Γ = TW []}            = Inl refl
-    dlt-elim {Γ = TW ((n , a) :: [])} = Inr (_ , _ , _ , refl , x#∅)
-    dlt-elim {Γ = TW ((n , a) :: ((m , a2) :: Γ''))}
-      with expr-eq (λ _ → (m + 1+ n , a2) :: Γ'')
-    ... | Γ' , eq
-      = Inr (n , a , TW Γ' , eqP , not-dom)
-        where
-          eqP : TW ((n , a) :: ((m , a2) :: Γ'')) == TW Γ' ,, (n , a)
-          eqP rewrite eq with <dec n (m + 1+ n)
-          ... | Inl n<m+1+n
-            rewrite ! (undiff-1 n m n<m+1+n) = refl
-          ... | Inr (Inl n==m+1+n)
-            = abort (n≠n+1+m (n==m+1+n · (n+1+m==1+n+m · +comm {1+ m})))
-          ... | Inr (Inr m+1+n<n)
-            = abort (<antisym m+1+n<n (n<m→n<s+m n<1+n))
-          not-dom : dom (TW Γ') n → ⊥
-          not-dom rewrite eq = λ n∈Γ' →
-            too-small (n<m→n<s+m n<1+n) n∈Γ'
+                Σ[ k ∈ Key ] Σ[ a ∈ A ] Σ[ Γ' ∈ t A ]
+                   (Γ == Γ' ,, (k , a) ∧ k # Γ')
+    dlt-elim {A} {TW Γ}
+      with dlt-elim' {A} {Γ}
+    ... | Inl refl = Inl refl
+    ... | Inr (n , _ , _ , refl , #)
+      with bij.surj bij n
+    ... | k , refl = Inr (_ , _ , _ , refl , #)
 
     -- When using dlt-elim or dlt-delete, this theorem is useful for establishing termination
-    dlt-decreasing : {A : Set} {Γ : t A} {n : Nat} {a : A} →
-                      n # Γ →
-                      || Γ ,, (n , a) || == 1+ || Γ ||
-    dlt-decreasing {A} {TW Γ} {n} {a} n#Γ = dlt-decreasing' {A} {Γ} {n} {a} n#Γ
-      where
-      dlt-decreasing' : {A : Set} {Γ : rt A} {n : Nat} {a : A} →
-                         n # TW Γ →
-                         || TW Γ ,, (n , a) || == 1+ || TW Γ ||
-      dlt-decreasing' {Γ = []} n#Γ = refl
-      dlt-decreasing' {Γ = (n' , a') :: Γ} {n} n#Γ
-        with <dec n n'
-      ... | Inl n<n'       = refl
-      ... | Inr (Inl refl) = abort (n#Γ (_ , InH))
-      ... | Inr (Inr n'<n)
-        = 1+ap (dlt-decreasing' λ {(a , diff∈Γ) →
-            n#Γ (a , tr
-                       (λ y → (y , a) ∈ TW ((n' , a') :: Γ))
-                       (m-n+n==m (n<m→1+n≤m n'<n))
-                       (InT diff∈Γ))})
+    dlt-decreasing : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                      k # Γ →
+                      || Γ ,, (k , a) || == 1+ || Γ ||
+    dlt-decreasing {A} {TW Γ} {k} {a} n#Γ = dlt-decreasing' {A} {Γ} {N k} {a} n#Γ
 
     ---- contrapositives of some previous theorems ----
 
@@ -538,21 +584,28 @@ module Delta where
     -}
 
     private
-      lookup-cp-1 : {A : Set} {Γ : t A} {x : Nat} →
-                     x # Γ →
-                     Γ ⦃⦃ x ⦄⦄ == None
-      lookup-cp-1 {Γ = Γ} {x} x#Γ
-        with lookup-dec Γ x
-      ... | Inl (_ , x∈Γ) = abort (x#Γ (_ , (lookup-cons-1 x∈Γ)))
-      ... | Inr x#'Γ      = x#'Γ
+      lookup-dec' : {A : Set} (Γ : rt A) (n : Nat) →
+                     Σ[ a ∈ A ] (Γ lkup n == Some a) ∨ Γ lkup n == None
+      lookup-dec' Γ n
+        with Γ lkup n
+      ... | Some a = Inl (a , refl)
+      ... | None   = Inr refl
 
-      x#Γ→x#Γ+ : {A : Set} {Γ : t A} {x x' : Nat} {a' : A} →
-                   x ≠ x' →
-                   x # Γ →
-                   x # (Γ ,, (x' , a'))
-      x#Γ→x#Γ+ {Γ = Γ} {x} {x'} {a'} x≠x' x#Γ
-        with dltindirect (Γ ,, (x' , a')) x
-      ... | Inl (_ , x∈Γ+) = abort (x#Γ (_ , x∈Γ+→x∈Γ x≠x' x∈Γ+))
+      lookup-cp-1' : {A : Set} {Γ : rt A} {n : Nat} →
+                      n #' Γ →
+                      Γ lkup n == None
+      lookup-cp-1' {Γ = Γ} {n} n#Γ
+        with lookup-dec' Γ n
+      ... | Inl (_ , n∈Γ) = abort (n#Γ (_ , lookup-cons-1' n∈Γ))
+      ... | Inr n#'Γ      = n#'Γ
+
+      x#Γ→'x#Γ+ : {A : Set} {Γ : rt A} {x x' : Nat} {a' : A} →
+                    x ≠ x' →
+                    x #' Γ →
+                    x #' (Γ ,,' (x' , a'))
+      x#Γ→'x#Γ+ {Γ = Γ} {x} {x'} {a'} x≠x' x#Γ
+        with dltindirect' (Γ ,,' (x' , a')) x
+      ... | Inl (_ , x∈Γ+) = abort (x#Γ (_ , x∈Γ+→'x∈Γ x≠x' x∈Γ+))
       ... | Inr x#Γ+       = x#Γ+
 
     ---- remaining definitions ----
@@ -568,114 +621,120 @@ module Delta where
       union' : {A : Set} → (A → A → A) → rt A → rt A → Nat → rt A
       union' merge Γ1 [] _ = Γ1
       union' merge Γ1 ((hx , ha) :: Γ2) offset
-        with TW Γ1 ,, (hx + offset , merge' merge (Γ1 lkup hx + offset) ha)
-      ... | TW Γ1+ = union' merge Γ1+ Γ2 (1+ hx + offset)
+        with Γ1 ,,' (hx + offset , merge' merge (Γ1 lkup hx + offset) ha)
+      ... | Γ1+ = union' merge Γ1+ Γ2 (1+ hx + offset)
+
+      dlt⇒list' : {A : Set} (Γ : rt A) → rt A
+      dlt⇒list' [] = []
+      dlt⇒list' ((x , a) :: Γ) = (x , a) :: map (λ {(x' , a') → x' + 1+ x , a'}) (dlt⇒list' Γ)
+
+      list⇒dlt' : {A : Set} (Γ : rt A) → rt A
+      list⇒dlt' = foldl _,,'_ []
 
     union merge (TW Γ1) (TW Γ2) = TW <| union' merge Γ1 Γ2 0
 
-    list⇒dlt = foldl _,,_ ∅
+    list⇒dlt Γ = Γ |> map (λ where (k , v) → (N k , v)) |> list⇒dlt' |> TW
 
-    dlt⇒list (TW []) = []
-    dlt⇒list (TW ((x , a) :: Γ)) = (x , a) :: map (λ {(x' , a') → x' + 1+ x , a'}) (dlt⇒list (TW Γ))
+    dlt⇒list (TW Γ) = dlt⇒list' Γ |> map (λ where (n , v) → (K n , v))
 
     dlt⇒values (TW Γ) = map π2 Γ
 
     list⇒list-dlt {A} l
       = foldl f ∅ (reverse l)
         where
-          f : t (List A) → Nat ∧ A → t (List A)
-          f Γ (n , a)
-            with dltindirect Γ n
-          ... | Inl (as , n∈Γ)
-            = Γ ,, (n , a :: as)
-          ... | Inr n#Γ
-            = Γ ,, (n , a :: [])
+          f : t (List A) → Key ∧ A → t (List A)
+          f (TW Γ) (k , a)
+            with dltindirect (TW Γ) k
+          ... | Inl (as , k∈Γ)
+            = TW Γ ,, (k , a :: as)
+          ... | Inr k#Γ
+            = TW Γ ,, (k , a :: [])
 
     ---- union and dlt <=> list lemmas ----
 
     private
 
       lemma-union'-0 : {A : Set} {m : A → A → A} {Γ1 Γ2 : rt A} {x n : Nat} {a : A} →
-                        (x , a) ∈ TW Γ1 →
-                        (x , a) ∈ TW (union' m Γ1 Γ2 (n + 1+ x))
+                        (x , a) ∈' Γ1 →
+                        (x , a) ∈' (union' m Γ1 Γ2 (n + 1+ x))
       lemma-union'-0 {Γ2 = []} x∈Γ1 = x∈Γ1
       lemma-union'-0 {Γ2 = (x1 , a1) :: Γ2} {x} {n} x∈Γ1
         rewrite ! (+assc {1+ x1} {n} {1+ x})
-          = lemma-union'-0 {Γ2 = Γ2} {n = 1+ x1 + n} (x∈Γ→x∈Γ+ (lemma-math' {x1 = x1} {n}) x∈Γ1)
+          = lemma-union'-0 {Γ2 = Γ2} {n = 1+ x1 + n} (x∈Γ→'x∈Γ+ (lemma-math' {x1 = x1} {n}) x∈Γ1)
 
       lemma-union'-1 : {A : Set} {m : A → A → A} {Γ1 Γ2 : rt A} {x n : Nat} {a : A} →
-                        (x , a) ∈ TW Γ1 →
+                        (x , a) ∈' Γ1 →
                         (n≤x : n ≤ x) →
-                        (difference n≤x) # TW Γ2 →
-                        (x , a) ∈ TW (union' m Γ1 Γ2 n)
+                        (difference n≤x) #' Γ2 →
+                        (x , a) ∈' (union' m Γ1 Γ2 n)
       lemma-union'-1 {Γ2 = []} {x} x∈Γ1 n≤x x-n#Γ2 = x∈Γ1
       lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2
         with <dec x (x1 + n)
       lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n
         with Γ1 lkup x1 + n
       lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n | Some a'
-        with expr-eq (λ _ → TW Γ1 ,, (x1 + n , m a' a1))
-      lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n | Some a' | TW Γ1+ , refl
+        with expr-eq (λ _ → Γ1 ,,' (x1 + n , m a' a1))
+      lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n | Some a' | Γ1+ , refl
         = tr
-             (λ y → (x , a) ∈ TW (union' m Γ1+ Γ2 y))
+             (λ y → (x , a) ∈' (union' m Γ1+ Γ2 y))
              (n+1+m==1+n+m {difference (π1 x<x1+n)} · 1+ap (m-n+n==m (π1 x<x1+n)))
-             (lemma-union'-0 {Γ2 = Γ2} (x∈Γ→x∈Γ+ (π2 x<x1+n) x∈Γ1))
+             (lemma-union'-0 {Γ2 = Γ2} (x∈Γ→'x∈Γ+ (π2 x<x1+n) x∈Γ1))
       lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n | None
-        with expr-eq (λ _ → TW Γ1 ,, (x1 + n , a1))
-      lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n | None | TW Γ1+ , refl
+        with expr-eq (λ _ → Γ1 ,,' (x1 + n , a1))
+      lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n | None | Γ1+ , refl
         = tr
-             (λ y → (x , a) ∈ TW (union' m Γ1+ Γ2 y))
+             (λ y → (x , a) ∈' (union' m Γ1+ Γ2 y))
              (n+1+m==1+n+m {difference (π1 x<x1+n)} · 1+ap (m-n+n==m (π1 x<x1+n)))
-             (lemma-union'-0 {Γ2 = Γ2} (x∈Γ→x∈Γ+ (π2 x<x1+n) x∈Γ1))
+             (lemma-union'-0 {Γ2 = Γ2} (x∈Γ→'x∈Γ+ (π2 x<x1+n) x∈Γ1))
       lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inr (Inl refl)
         rewrite +comm {x1} {n} | n+m-n==m n≤x
           = abort (x-n#Γ2 (_ , InH))
       lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inr (Inr x1+n<x)
         rewrite (! (a+b==c→a==c-b (+assc {diff-1 x1+n<x} · m-n+n==m (n<m→1+n≤m x1+n<x)) n≤x))
           = lemma-union'-1
-              (x∈Γ→x∈Γ+ (flip (π2 x1+n<x)) x∈Γ1)
+              (x∈Γ→'x∈Γ+ (flip (π2 x1+n<x)) x∈Γ1)
               (n<m→1+n≤m x1+n<x)
               λ {(_ , x-x1-n∈Γ2) → x-n#Γ2 (_ , InT x-x1-n∈Γ2)}
 
       lemma-union'-2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : rt A} {x n : Nat} {a : A} →
-                        (x + n) # TW Γ1 →
-                        (x , a) ∈ TW Γ2 →
-                        (x + n , a) ∈ TW (union' m Γ1 Γ2 n)
+                        (x + n) #' Γ1 →
+                        (x , a) ∈' Γ2 →
+                        (x + n , a) ∈' (union' m Γ1 Γ2 n)
       lemma-union'-2 {Γ1 = Γ1} x+n#Γ1 (InH {Γ = Γ2})
-        rewrite lookup-cp-1 x+n#Γ1
-          = lemma-union'-0 {Γ2 = Γ2} {n = Z} (x,a∈Γ,,x,a {Γ = TW Γ1})
-      lemma-union'-2 {Γ1 = Γ1} {n = n} x+n#Γ1 (InT {Γ = Γ2} {x = x} {s} x∈Γ2)
+        rewrite lookup-cp-1' x+n#Γ1
+          = lemma-union'-0 {Γ2 = Γ2} {n = Z} (x,v∈'Γ,,x,v {Γ = Γ1})
+      lemma-union'-2 {Γ1 = Γ1} {n = n} x+n#Γ1 (InT {Γ = Γ2} {n = x} {s} x∈Γ2)
         rewrite +assc {x} {1+ s} {n}
         with Γ1 lkup s + n
       ... | Some a'
         = lemma-union'-2
             (λ {(_ , x∈Γ1+) →
-                 x+n#Γ1 (_ , x∈Γ+→x∈Γ (flip (lemma-math' {x1 = Z})) x∈Γ1+)})
+                 x+n#Γ1 (_ , x∈Γ+→'x∈Γ (flip (lemma-math' {x1 = Z})) x∈Γ1+)})
             x∈Γ2
       ... | None
         = lemma-union'-2
             (λ {(_ , x∈Γ1+) →
-                 x+n#Γ1 (_ , x∈Γ+→x∈Γ (flip (lemma-math' {x1 = Z})) x∈Γ1+)})
+                 x+n#Γ1 (_ , x∈Γ+→'x∈Γ (flip (lemma-math' {x1 = Z})) x∈Γ1+)})
             x∈Γ2
 
       lemma-union'-3 : {A : Set} {m : A → A → A} {Γ1 Γ2 : rt A} {x n : Nat} {a1 a2 : A} →
-                        (x + n , a1) ∈ TW Γ1 →
-                        (x , a2) ∈ TW Γ2 →
-                        (x + n , m a1 a2) ∈ TW (union' m Γ1 Γ2 n)
+                        (x + n , a1) ∈' Γ1 →
+                        (x , a2) ∈' Γ2 →
+                        (x + n , m a1 a2) ∈' (union' m Γ1 Γ2 n)
       lemma-union'-3 {Γ1 = Γ1} x+n∈Γ1 (InH {Γ = Γ2})
-        rewrite lookup-cons-2 x+n∈Γ1
-          = lemma-union'-0 {Γ2 = Γ2} {n = Z} (x,a∈Γ,,x,a {Γ = TW Γ1})
-      lemma-union'-3 {Γ1 = Γ1} {n = n} x+n∈Γ1 (InT {Γ = Γ2} {x = x} {s} x∈Γ2)
+        rewrite lookup-cons-2' x+n∈Γ1
+          = lemma-union'-0 {Γ2 = Γ2} {n = Z} (x,v∈'Γ,,x,v {Γ = Γ1})
+      lemma-union'-3 {Γ1 = Γ1} {n = n} x+n∈Γ1 (InT {Γ = Γ2} {n = x} {s} x∈Γ2)
         rewrite +assc {x} {1+ s} {n}
         with Γ1 lkup s + n
       ... | Some a'
-        = lemma-union'-3 (x∈Γ→x∈Γ+ (flip (lemma-math' {x1 = Z})) x+n∈Γ1) x∈Γ2
+        = lemma-union'-3 (x∈Γ→'x∈Γ+ (flip (lemma-math' {x1 = Z})) x+n∈Γ1) x∈Γ2
       ... | None
-        = lemma-union'-3 (x∈Γ→x∈Γ+ (flip (lemma-math' {x1 = Z})) x+n∈Γ1) x∈Γ2
+        = lemma-union'-3 (x∈Γ→'x∈Γ+ (flip (lemma-math' {x1 = Z})) x+n∈Γ1) x∈Γ2
 
       lemma-union'-4 : {A : Set} {m : A → A → A} {Γ1 Γ2 : rt A} {x n : Nat} →
-                        dom (TW <| union' m Γ1 Γ2 n) x →
-                        dom (TW Γ1) x ∨ (Σ[ s ∈ Nat ] (x == n + s ∧ dom (TW Γ2) s))
+                        dom' (union' m Γ1 Γ2 n) x →
+                        dom' Γ1 x ∨ (Σ[ s ∈ Nat ] (x == n + s ∧ dom' Γ2 s))
       lemma-union'-4 {Γ2 = []} x∈un = Inl x∈un
       lemma-union'-4 {Γ1 = Γ1} {(x1 , a1) :: Γ2} {x} {n} x∈un
         with lemma-union'-4 {Γ2 = Γ2} x∈un
@@ -691,14 +750,14 @@ module Delta where
       ... | Inl refl   = Inr (_ , refl , _ , InH)
       ... | Inr x≠n+x1
         rewrite +comm {x1} {n}
-          = Inl (_ , x∈Γ+→x∈Γ x≠n+x1 x∈Γ1+)
+          = Inl (_ , x∈Γ+→'x∈Γ x≠n+x1 x∈Γ1+)
 
       lemma-dlt⇒list' : {A : Set} {Γ Γ' : rt A} {x : Nat} {a : A} →
                             foldl
-                              (λ {b (x' , a') → b ,, (x' + 1+ x , a')})
-                              (TW <| (x , a) :: Γ')
+                              (λ {b (x' , a') → b ,,' (x' + 1+ x , a')})
+                              ((x , a) :: Γ')
                               Γ
-                            == TW ((x , a) :: (unwrap' <| foldl _,,_ (TW Γ') Γ))
+                            == ((x , a) :: (foldl _,,'_ Γ' Γ))
       lemma-dlt⇒list' {Γ = []} = refl
       lemma-dlt⇒list' {Γ = (x2 , a2) :: Γ} {x = x}
         with <dec (x2 + 1+ x) x
@@ -710,67 +769,19 @@ module Delta where
         rewrite ! (undiff-1 x x2 x<x2+1+x)
           = lemma-dlt⇒list' {Γ = Γ}
 
-    ---- union theorems ----
-
-    x,a∈Γ1→x∉Γ2→x,a∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : t A} {x : Nat} {a : A} →
-                                (x , a) ∈ Γ1 →
-                                x # Γ2 →
-                                (x , a) ∈ union m Γ1 Γ2
-    x,a∈Γ1→x∉Γ2→x,a∈Γ1∪Γ2 {Γ1 = TW Γ1} {TW Γ2} x∈Γ1 x#Γ2
-      = lemma-union'-1 x∈Γ1 0≤n (tr (λ y → y # TW Γ2) (! (n+m-n==m 0≤n)) x#Γ2)
-
-    x∉Γ1→x,a∈Γ2→x,a∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : t A} {x : Nat} {a : A} →
-                                x # Γ1 →
-                                (x , a) ∈ Γ2 →
-                                (x , a) ∈ union m Γ1 Γ2
-    x∉Γ1→x,a∈Γ2→x,a∈Γ1∪Γ2 {Γ1 = TW Γ1} {TW Γ2} {x} x#Γ1 x∈Γ2
-      with lemma-union'-2 {n = Z} (tr (λ y → y # TW Γ1) (! n+Z==n) x#Γ1) x∈Γ2
-    ... | rslt
-      rewrite n+Z==n {x}
-        = rslt
-
-    x∈Γ1→x∈Γ2→x∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : t A} {x : Nat} {a1 a2 : A} →
-                                (x , a1) ∈ Γ1 →
-                                (x , a2) ∈ Γ2 →
-                                (x , m a1 a2) ∈ union m Γ1 Γ2
-    x∈Γ1→x∈Γ2→x∈Γ1∪Γ2 {Γ1 = TW Γ1} {TW Γ2} {x} {a1} x∈Γ1 x∈Γ2
-      with lemma-union'-3 (tr (λ y → (y , a1) ∈ TW Γ1) (! n+Z==n) x∈Γ1) x∈Γ2
-    ... | rslt
-      rewrite n+Z==n {x}
-        = rslt
-
-    x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : t A} {x : Nat} →
-                            dom (union m Γ1 Γ2) x →
-                            dom Γ1 x ∨ dom Γ2 x
-    x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 {Γ1 = TW Γ1} {TW Γ2} x∈Γ1∪Γ2
-      with lemma-union'-4 {n = Z} x∈Γ1∪Γ2
-    x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 x∈Γ1∪Γ2 | Inl x'∈Γ1 = Inl x'∈Γ1
-    x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 x∈Γ1∪Γ2 | Inr (_ , refl , x'∈Γ2) = Inr x'∈Γ2
-
-    ---- dlt <=> list theorems ----
-
-    dlt⇒list-inversion : {A : Set} {Γ : t A} → list⇒dlt (dlt⇒list Γ) == Γ
-    dlt⇒list-inversion {A} {TW Γ} = dlt⇒list-inversion' {A} {Γ}
-      where
-      dlt⇒list-inversion' : {A : Set} {Γ : rt A} → list⇒dlt (dlt⇒list (TW Γ)) == TW Γ
+      dlt⇒list-inversion' : {A : Set} {Γ : rt A} → list⇒dlt' (dlt⇒list' Γ) == Γ
       dlt⇒list-inversion' {Γ = []} = refl
       dlt⇒list-inversion' {Γ = (x , a) :: Γ}
         with dlt⇒list-inversion' {Γ = Γ}
       ... | rec
-        = foldl-map {l = dlt⇒list (TW Γ)} {_,,_} {λ {(x' , a') → x' + 1+ x , a'}} {TW <| (x , a) :: []}
-          · (lemma-dlt⇒list' {Γ = dlt⇒list (TW Γ)} · ap1 (λ y → TW <| (x , a) :: y) (unwrap-asym' rec))
+        = foldl-map {l = dlt⇒list' Γ} {_,,'_} {λ {(x' , a') → x' + 1+ x , a'}} {(x , a) :: []}
+          · (lemma-dlt⇒list' {Γ = dlt⇒list' Γ} · ap1 (λ y → (x , a) :: y) rec)
 
-    ---- contraction and exchange ----
+      -- TODO these proofs could use refactoring -
+      -- contraction should probably make use of dlt-==-dec and
+      -- exchange is way too long and repetitive
 
-    -- TODO these proofs could use refactoring -
-    -- contraction should probably make use of dlt-==-dec and
-    -- exchange is way too long and repetitive
-
-    contraction : {A : Set} {Γ : t A} {x : Nat} {a a' : A} →
-                   Γ ,, (x , a') ,, (x , a) == Γ ,, (x , a)
-    contraction {A} {TW Γ} {x} {a} {a'} = contraction' {A} {Γ} {x} {a} {a'}
-      where
-      contraction' : {A : Set} {Γ : rt A} {x : Nat} {a a' : A} → TW Γ ,, (x , a') ,, (x , a) == TW Γ ,, (x , a)
+      contraction' : {A : Set} {Γ : rt A} {x : Nat} {a a' : A} → (Γ ,,' (x , a')) ,,' (x , a) == Γ ,,' (x , a)
       contraction' {Γ = []} {x} rewrite <dec-refl x = refl
       contraction' {Γ = (hx , ha) :: t} {x} {a} {a'}
         with <dec x hx
@@ -783,55 +794,124 @@ module Delta where
       ... | Inr (Inr hx<'x)
         with contraction' {Γ = t} {diff-1 hx<'x} {a} {a'}
       ... | eq
-        rewrite diff-proof-irrelevance (n<m→1+n≤m hx<x) (n<m→1+n≤m hx<'x) | unwrap-eq' eq
+        rewrite diff-proof-irrelevance (n<m→1+n≤m hx<x) (n<m→1+n≤m hx<'x) | eq
           = refl
 
-    exchange : {A : Set} {Γ : t A} {x1 x2 : Nat} {a1 a2 : A} →
-                x1 ≠ x2 →
-                Γ ,, (x1 , a1) ,, (x2 , a2) == Γ ,, (x2 , a2) ,, (x1 , a1)
-    exchange {A} {Γ} {x1} {x2} {a1} {a2} x1≠x2
-      = dlt-==-eqv fun
+      exchange' : {A : Set} {Γ : rt A} {x1 x2 : Nat} {a1 a2 : A} →
+                   x1 ≠ x2 →
+                   (Γ ,,' (x1 , a1)) ,,' (x2 , a2) == (Γ ,,' (x2 , a2)) ,,' (x1 , a1)
+      exchange' {A} {Γ} {x1} {x2} {a1} {a2} x1≠x2 = dlt-==-eqv' fun
         where
           fun : (x : Nat) →
-                 (Γ ,, (x1 , a1) ,, (x2 , a2)) ⦃⦃ x ⦄⦄ ==
-                 (Γ ,, (x2 , a2) ,, (x1 , a1)) ⦃⦃ x ⦄⦄
+                 ((Γ ,,' (x1 , a1)) ,,' (x2 , a2)) lkup x ==
+                 ((Γ ,,' (x2 , a2)) ,,' (x1 , a1)) lkup x
           fun x
-            with natEQ x x1 | natEQ x x2 | dltindirect Γ x
+            with natEQ x x1 | natEQ x x2 | dltindirect' Γ x
           fun x  | Inl refl | Inl refl | _
             = abort (x1≠x2 refl)
           fun x1 | Inl refl | Inr x≠x2 | Inl (_ , x1∈Γ)
-            with x,a∈Γ,,x,a {Γ = Γ} {x1} {a1}
+            with x,v∈'Γ,,x,v {Γ = Γ} {x1} {a1}
           ... | x∈Γ+1
-            with x∈Γ→x∈Γ+ {a' = a2} x≠x2 x∈Γ+1 | x,a∈Γ,,x,a {Γ = Γ ,, (x2 , a2)} {x1} {a1}
+            with x∈Γ→'x∈Γ+ {a' = a2} x≠x2 x∈Γ+1 | x,v∈'Γ,,x,v {Γ = Γ ,,' (x2 , a2)} {x1} {a1}
           ... | x∈Γ++1 | x∈Γ++2
-            rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+            rewrite lookup-cons-2' x∈Γ++1 | lookup-cons-2' x∈Γ++2 = refl
           fun x1 | Inl refl | Inr x≠x2 | Inr x1#Γ
-            with x,a∈Γ,,x,a {Γ = Γ} {x1} {a1}
+            with x,v∈'Γ,,x,v {Γ = Γ} {x1} {a1}
           ... | x∈Γ+1
-            with x∈Γ→x∈Γ+ {a' = a2} x≠x2 x∈Γ+1 | x,a∈Γ,,x,a {Γ = Γ ,, (x2 , a2)} {x1} {a1}
+            with x∈Γ→'x∈Γ+ {a' = a2} x≠x2 x∈Γ+1 | x,v∈'Γ,,x,v {Γ = Γ ,,' (x2 , a2)} {x1} {a1}
           ... | x∈Γ++1 | x∈Γ++2
-            rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+            rewrite lookup-cons-2' x∈Γ++1 | lookup-cons-2' x∈Γ++2 = refl
           fun x2 | Inr x≠x1 | Inl refl | Inl (_ , x2∈Γ)
-            with x,a∈Γ,,x,a {Γ = Γ} {x2} {a2}
+            with x,v∈'Γ,,x,v {Γ = Γ} {x2} {a2}
           ... | x∈Γ+2
-            with x∈Γ→x∈Γ+ {a' = a1} x≠x1 x∈Γ+2 | x,a∈Γ,,x,a {Γ = Γ ,, (x1 , a1)} {x2} {a2}
+            with x∈Γ→'x∈Γ+ {a' = a1} x≠x1 x∈Γ+2 | x,v∈'Γ,,x,v {Γ = Γ ,,' (x1 , a1)} {x2} {a2}
           ... | x∈Γ++1 | x∈Γ++2
-            rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+            rewrite lookup-cons-2' x∈Γ++1 | lookup-cons-2' x∈Γ++2 = refl
           fun x2 | Inr x≠x1 | Inl refl | Inr x2#Γ
-            with x,a∈Γ,,x,a {Γ = Γ} {x2} {a2}
+            with x,v∈'Γ,,x,v {Γ = Γ} {x2} {a2}
           ... | x∈Γ+2
-            with x∈Γ→x∈Γ+ {a' = a1} x≠x1 x∈Γ+2 | x,a∈Γ,,x,a {Γ = Γ ,, (x1 , a1)} {x2} {a2}
+            with x∈Γ→'x∈Γ+ {a' = a1} x≠x1 x∈Γ+2 | x,v∈'Γ,,x,v {Γ = Γ ,,' (x1 , a1)} {x2} {a2}
           ... | x∈Γ++1 | x∈Γ++2
-            rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+            rewrite lookup-cons-2' x∈Γ++1 | lookup-cons-2' x∈Γ++2 = refl
           fun x  | Inr x≠x1 | Inr x≠x2 | Inl (_ , x∈Γ)
-            with x∈Γ→x∈Γ+ {a' = a1} x≠x1 x∈Γ   | x∈Γ→x∈Γ+ {a' = a2} x≠x2 x∈Γ
+            with x∈Γ→'x∈Γ+ {a' = a1} x≠x1 x∈Γ   | x∈Γ→'x∈Γ+ {a' = a2} x≠x2 x∈Γ
           ... | x∈Γ+1  | x∈Γ+2
-            with x∈Γ→x∈Γ+ {a' = a2} x≠x2 x∈Γ+1 | x∈Γ→x∈Γ+ {a' = a1} x≠x1 x∈Γ+2
+            with x∈Γ→'x∈Γ+ {a' = a2} x≠x2 x∈Γ+1 | x∈Γ→'x∈Γ+ {a' = a1} x≠x1 x∈Γ+2
           ... | x∈Γ++1 | x∈Γ++2
-            rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+            rewrite lookup-cons-2' x∈Γ++1 | lookup-cons-2' x∈Γ++2 = refl
           fun x  | Inr x≠x1 | Inr x≠x2 | Inr x#Γ
-            with x#Γ→x#Γ+ {a' = a1} x≠x1 x#Γ   | x#Γ→x#Γ+ {a' = a2} x≠x2 x#Γ
+            with x#Γ→'x#Γ+ {a' = a1} x≠x1 x#Γ   | x#Γ→'x#Γ+ {a' = a2} x≠x2 x#Γ
           ... | x#Γ+1  | x#Γ+2
-            with x#Γ→x#Γ+ {a' = a2} x≠x2 x#Γ+1 | x#Γ→x#Γ+ {a' = a1} x≠x1 x#Γ+2
+            with x#Γ→'x#Γ+ {a' = a2} x≠x2 x#Γ+1 | x#Γ→'x#Γ+ {a' = a1} x≠x1 x#Γ+2
           ... | x#Γ++1 | x#Γ++2
-            rewrite lookup-cp-1 x#Γ++1 | lookup-cp-1 x#Γ++2 = refl
+            rewrite lookup-cp-1' x#Γ++1 | lookup-cp-1' x#Γ++2 = refl
+
+    ---- union theorems ----
+
+    x,a∈Γ1→x∉Γ2→x,a∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : t A} {k : Key} {a : A} →
+                                (k , a) ∈ Γ1 →
+                                k # Γ2 →
+                                (k , a) ∈ union m Γ1 Γ2
+    x,a∈Γ1→x∉Γ2→x,a∈Γ1∪Γ2 {Γ1 = TW Γ1} {TW Γ2} x∈Γ1 x#Γ2
+      = lemma-union'-1 x∈Γ1 0≤n (tr (λ y → y #' Γ2) (! (n+m-n==m 0≤n)) x#Γ2)
+
+    x∉Γ1→x,a∈Γ2→x,a∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : t A} {k : Key} {a : A} →
+                                k # Γ1 →
+                                (k , a) ∈ Γ2 →
+                                (k , a) ∈ union m Γ1 Γ2
+    x∉Γ1→x,a∈Γ2→x,a∈Γ1∪Γ2 {Γ1 = TW Γ1} {TW Γ2} {x} x#Γ1 x∈Γ2
+      with lemma-union'-2 {n = Z} (tr (λ y → y #' Γ1) (! n+Z==n) x#Γ1) x∈Γ2
+    ... | rslt
+      rewrite n+Z==n {N x}
+        = rslt
+
+    x∈Γ1→x∈Γ2→x∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : t A} {k : Key} {a1 a2 : A} →
+                                (k , a1) ∈ Γ1 →
+                                (k , a2) ∈ Γ2 →
+                                (k , m a1 a2) ∈ union m Γ1 Γ2
+    x∈Γ1→x∈Γ2→x∈Γ1∪Γ2 {Γ1 = TW Γ1} {TW Γ2} {x} {a1} x∈Γ1 x∈Γ2
+      with lemma-union'-3 (tr (λ y → (y , a1) ∈' Γ1) (! n+Z==n) x∈Γ1) x∈Γ2
+    ... | rslt
+      rewrite n+Z==n {N x}
+        = rslt
+
+    x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : t A} {k : Key} →
+                            dom (union m Γ1 Γ2) k →
+                            dom Γ1 k ∨ dom Γ2 k
+    x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 {Γ1 = TW Γ1} {TW Γ2} x∈Γ1∪Γ2
+      with lemma-union'-4 {n = Z} x∈Γ1∪Γ2
+    x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 x∈Γ1∪Γ2 | Inl x'∈Γ1 = Inl x'∈Γ1
+    x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 x∈Γ1∪Γ2 | Inr (_ , refl , x'∈Γ2) = Inr x'∈Γ2
+
+    ---- dlt <=> list theorems ----
+
+    dlt⇒list-inversion : {A : Set} {Γ : t A} → list⇒dlt (dlt⇒list Γ) == Γ
+    dlt⇒list-inversion {A} {TW Γ}
+      = tr
+           (λ y → TW (list⇒dlt' y) == TW Γ)
+           (! (map^2 {f = λ { (k , v) → N k , v }}
+                     {λ { (n , v) → K n , v }}
+                     {dlt⇒list' Γ}))
+           lem
+        where
+        lem' : ∀{l} → map {Nat ∧ A} ((λ { (k , v) → N k , v }) ⊙ (λ { (n , v) → K n , v })) l == l
+        lem' {[]} = refl
+        lem' {(n , v) :: t} rewrite lem' {t} | convert-bij2 {t = n} = refl
+        lem : TW (list⇒dlt'
+                   (map ((λ { (k , v) → N k , v }) ⊙ (λ { (n , v) → K n , v }))
+                     (dlt⇒list' Γ)))
+              == TW Γ
+        lem rewrite lem' {dlt⇒list' Γ} = ap1 TW dlt⇒list-inversion'
+
+    ---- contraction and exchange ----
+
+    contraction : {A : Set} {Γ : t A} {k : Key} {a a' : A} →
+                   Γ ,, (k , a') ,, (k , a) == Γ ,, (k , a)
+    contraction {A} {TW Γ} {k} {a} {a'}
+      = ap1 TW <| contraction' {Γ = Γ} {N k} {a} {a'}
+
+    exchange : {A : Set} {Γ : t A} {k1 k2 : Key} {a1 a2 : A} →
+                k1 ≠ k2 →
+                Γ ,, (k1 , a1) ,, (k2 , a2) == Γ ,, (k2 , a2) ,, (k1 , a1)
+    exchange {A} {TW Γ} {k1} {k2} {a1} {a2} k1≠k2
+      = ap1 TW <| exchange' {Γ = Γ} <| inj-cp k1≠k2
