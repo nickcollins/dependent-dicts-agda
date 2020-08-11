@@ -1,4 +1,4 @@
-# hazelnat-myth-agda
+# Delta dictionaries in Agda
 This repository is the mechanization of delta dictionaries, as described in
 [this paper](https://github.com/nickcollins/dependent-dicts).
 
