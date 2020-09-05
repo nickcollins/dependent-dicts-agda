@@ -15,7 +15,8 @@ open import Bij
 -- to continue with the the non-standard forms and definitions. We hope that they are
 -- fairly self-explanatory and intuitive. Below we note some of our idioms that may
 -- not be obvious:
--- * abort used to prove any goal given ⊥
+-- * We use "Some" and "None" instead of "Just" and "Nothing"
+-- * abort is used to prove any goal given ⊥
 -- * == is used for reflexive equality
 -- * Z is zero, 1+ is suc
 -- * ≤ is defined as data, < is defined as n < m = n ≤ m ∧ n ≠ m
