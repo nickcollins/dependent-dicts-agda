@@ -25,6 +25,10 @@ module List where
   (a :: as) ⟦ Z ⟧ = Some a
   (a :: as) ⟦ 1+ i ⟧ = as ⟦ i ⟧
 
+  data _In_ : {A : Set} → A → List A → Set where
+    LInH : ∀{A} {a : A} {l : List A} → a In (a :: l)
+    LInT : ∀{A} {a a' : A} {l : List A} → a In l → a In (a' :: l)
+
   _⫇_ : {A : Set} → List A → List A → Set
   _⫇_ {A} l1 l2 = (i1 : Nat) (a : A) →
                   l1 ⟦ i1 ⟧ == Some a →
@@ -33,6 +37,10 @@ module List where
   _≈_ : {A : Set} → List A → List A → Set
   _≈_ {A} l1 l2 = l1 ⫇ l2 ∧ l2 ⫇ l1
 
+  reverse : {A : Set} → List A → List A
+  reverse [] = []
+  reverse (a :: as) = reverse as ++ (a :: [])
+
   map : {A B : Set} → (A → B) → List A → List B
   map f [] = []
   map f (a :: as) = f a :: map f as
@@ -40,6 +48,9 @@ module List where
   foldl : {A B : Set} → (B → A → B) → B → List A → B
   foldl f b [] = b
   foldl f b (a :: as) = foldl f (f b a) as
+
+  foldr : {A B : Set} → (B → A → B) → B → List A → B
+  foldr f b = foldl f b ⊙ reverse
 
   concat : {A : Set} → List (List A) → List A
   concat [] = []
@@ -57,10 +68,6 @@ module List where
   unzip ((a , b) :: rest)
     with unzip rest
   ... | (as , bs) = (a :: as , b :: bs)
-
-  reverse : {A : Set} → List A → List A
-  reverse [] = []
-  reverse (a :: as) = reverse as ++ (a :: [])
 
   -- theorems
 
@@ -197,7 +204,42 @@ module List where
   ... | Inl i∈l1 = Inl i∈l1
   ... | Inr (j , |l1|+j=i , j∈l2) = Inr (_ , 1+ap |l1|+j=i , j∈l2)
 
-  -- map theoremS
+  -- reverse theorems
+  reverse-single : {A : Set} {a : A} → reverse (a :: []) == a :: []
+  reverse-single = refl
+
+  reverse-++ : {A : Set} {l1 l2 : List A} →
+                reverse (l1 ++ l2) == reverse l2 ++ reverse l1
+  reverse-++ {l1 = []} {l2}
+    rewrite l++[]==l (reverse l2)
+      = refl
+  reverse-++ {l1 = a1 :: as1} {l2}
+    rewrite reverse-++ {l1 = as1} {l2}
+      = ++assc {a1 = reverse l2}
+
+  reverse-inv : {A : Set} {l : List A} → reverse (reverse l) == l
+  reverse-inv {l = []} = refl
+  reverse-inv {l = a :: as}
+    rewrite reverse-++ {l1 = reverse as} {a :: []} | reverse-inv {l = as}
+      = refl
+
+  -- map theorems
+  map-ext : ∀{A B : Set} {f g : A → B} {l : List A} →
+              ((a : A) → f a == g a) →
+              map f l == map g l
+  map-ext {l = []} ext = refl
+  map-ext {l = a :: l} ext rewrite ext a | map-ext {l = l} ext = refl
+
+  map-len : ∀{A B : Set} {f : A → B} {l : List A} → ∥ map f l ∥ == ∥ l ∥
+  map-len {l = []} = refl
+  map-len {l = _ :: l} = 1+ap map-len
+
+  map-In : ∀{A B : Set} {f : A → B} {l : List A} {a : A} →
+             a In l →
+             f a In map f l
+  map-In LInH = LInH
+  map-In (LInT aInL) = LInT (map-In aInL)
+
   map-++-comm : ∀{A B f a b} → map f a ++ map f b == map {A} {B} f (a ++ b)
   map-++-comm {a = []} = refl
   map-++-comm {A} {B} {f} {h :: t} {b} with map f (t ++ b) | map-++-comm {A} {B} {f} {t} {b}
@@ -207,17 +249,29 @@ module List where
   map^2 {l = []} = refl
   map^2 {f = f} {g} {h :: t} rewrite map^2 {f = f} {g} {t} = refl
 
+  reverse-map : {A B : Set} {f : A → B} {l : List A} → reverse (map f l) == map f (reverse l)
+  reverse-map {l = []} = refl
+  reverse-map {f = f} {a' :: l}
+    rewrite reverse-map {f = f} {l}
+      = map-++-comm {a = reverse l}
+
   -- foldl theorem
   foldl-++ : {A B : Set} {l1 l2 : List A} {f : B → A → B} {b0 : B} →
               foldl f b0 (l1 ++ l2) == foldl f (foldl f b0 l1) l2
   foldl-++ {l1 = []} = refl
   foldl-++ {l1 = a1 :: l1rest} = foldl-++ {l1 = l1rest}
 
-  -- foldl and map theorem
+  -- fold+map theorem
   foldl-map : {A' A B : Set} {l : List A'} {f-fold : B → A → B} {f-map : A' → A} {b0 : B} →
                foldl f-fold b0 (map f-map l) == foldl (λ b a' → f-fold b (f-map a')) b0 l
   foldl-map {l = []} = refl
   foldl-map {l = a' :: l} {f-fold} {f-map} {b0} = foldl-map {l = l}
+
+  foldr-map : {A' A B : Set} {l : List A'} {f-fold : B → A → B} {f-map : A' → A} {b0 : B} →
+               foldr f-fold b0 (map f-map l) == foldr (λ b a' → f-fold b (f-map a')) b0 l
+  foldr-map {l = l} {_} {f}
+    rewrite reverse-map {f = f} {l}
+      = foldl-map {l = reverse l}
 
   -- zip/unzip theorems
   unzip-inv : {A B : Set} {l : List (A ∧ B)} {la : List A} {lb : List B} →
@@ -237,25 +291,6 @@ module List where
   zip-inv {la = a :: as} {b :: bs} len-eq
     with unzip (zip as bs) | zip-inv (1+inj len-eq)
   ...  | (as' , bs')       | refl                   = refl
-
-  -- reverse theorems
-  reverse-single : {A : Set} {a : A} → reverse (a :: []) == a :: []
-  reverse-single = refl
-
-  reverse-++ : {A : Set} {l1 l2 : List A} →
-                reverse (l1 ++ l2) == reverse l2 ++ reverse l1
-  reverse-++ {l1 = []} {l2}
-    rewrite l++[]==l (reverse l2)
-      = refl
-  reverse-++ {l1 = a1 :: as1} {l2}
-    rewrite reverse-++ {l1 = as1} {l2}
-      = ++assc {a1 = reverse l2}
-
-  reverse-inv : {A : Set} {l : List A} → reverse (reverse l) == l
-  reverse-inv {l = []} = refl
-  reverse-inv {l = a :: as}
-    rewrite reverse-++ {l1 = reverse as} {a :: []} | reverse-inv {l = as}
-      = refl
 
   -- _≈_ theorems
   ≈-++-comm-lem' : (A : Set) (l1 l2 : List A) (i : Nat) (a : A) →
