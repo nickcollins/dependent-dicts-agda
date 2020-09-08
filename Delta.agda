@@ -317,29 +317,6 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
             lem' | Inr (Inl false)     = abort (lemma-math' {x1 = Z} (! false))
             lem' | Inr (Inr n'<x+1+n') rewrite ! (undiff-1 n' x n'<x+1+n') = refl
 
-      dlt-elim' : {A : Set} {Γ : rt A} →
-                   Γ == []
-                      ∨
-                   Σ[ n ∈ Nat ] Σ[ a ∈ A ] Σ[ Γ' ∈ rt A ]
-                      (Γ == Γ' ,,' (n , a) ∧ n #' Γ')
-      dlt-elim' {Γ = []}              = Inl refl
-      dlt-elim' {Γ = ((n , a) :: [])} = Inr (_ , _ , _ , refl , x#'[])
-      dlt-elim' {Γ = ((n , a) :: ((m , a2) :: Γ''))}
-        with expr-eq (λ _ → (m + 1+ n , a2) :: Γ'')
-      ... | Γ' , eq
-        = Inr (n , a , Γ' , eqP , not-dom)
-          where
-          eqP : ((n , a) :: ((m , a2) :: Γ'')) == Γ' ,,' (n , a)
-          eqP rewrite eq with <dec n (m + 1+ n)
-          ... | Inl n<m+1+n
-            rewrite ! (undiff-1 n m n<m+1+n) = refl
-          ... | Inr (Inl n==m+1+n)
-                  = abort (n≠n+1+m (n==m+1+n · (n+1+m==1+n+m · +comm {1+ m})))
-          ... | Inr (Inr m+1+n<n)
-                  = abort (<antisym m+1+n<n (n<m→n<s+m n<1+n))
-          not-dom : dom' Γ' n → ⊥
-          not-dom rewrite eq = λ n∈Γ' → too-small (n<m→n<s+m n<1+n) n∈Γ'
-
       dlt-decreasing' : {A : Set} {Γ : rt A} {n : Nat} {a : A} →
                          n #' Γ →
                          ∥ Γ ,,' (n , a) ∥ == 1+ ∥ Γ ∥
@@ -703,6 +680,14 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
     ||_|| : {A : Set} → t A → Nat
     || TW Γ || = ∥ Γ ∥
 
+    dlt-destruct : ∀{V} → t V → Maybe ((Key ∧ V) ∧ t V)
+    dlt-destruct (TW [])
+      = None
+    dlt-destruct (TW ((n , v) :: []))
+      = Some ((K n , v) , TW [])
+    dlt-destruct (TW ((n , v) :: ((m , v') :: t)))
+      = Some ((K n , v) , TW ((m + 1+ n , v') :: t))
+
     ---- core theorems ----
 
     -- The next two theorems show that lookup (_⦃⦃_⦄⦄) is consistent with membership (_∈_)
@@ -797,6 +782,35 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
       ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
       ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
 
+    destruct-thm-1 : ∀{V} {d : t V} →
+                       dlt-destruct d == None →
+                       d == ∅
+    destruct-thm-1 {d = TW []} eq = refl
+    destruct-thm-1 {d = TW (_ :: [])} ()
+    destruct-thm-1 {d = TW (_ :: (_ :: _))} ()
+
+    destruct-thm-2 : ∀{V} {d d' : t V} {k : Key} {v : V} →
+                       dlt-destruct d == Some ((k , v) , d') →
+                       k # d' ∧ d == d' ,, (k , v)
+    destruct-thm-2 {d = TW ((n , v) :: [])} refl
+      rewrite convert-bij2 {{bij}} {t = n}
+        = x#'[] , refl
+    destruct-thm-2 {d = TW ((n , v) :: ((m , v') :: t))} refl
+      rewrite convert-bij2 {{bij}} {t = n}
+      with too-small (n<m→n<s+m n<1+n)
+    ... | not-in
+      with <dec n (m + 1+ n)
+    ... | Inl lt rewrite ! (undiff-1 n m lt) = not-in , refl
+    ... | Inr (Inl eq) = abort (n≠n+1+m (eq · (n+1+m==1+n+m · +comm {1+ m})))
+    ... | Inr (Inr gt) = abort (<antisym gt (n<m→n<s+m n<1+n))
+
+    destruct-thm : ∀{V} {d d' : t V} {k : Key} {v : V} →
+                     (dlt-destruct d == None → d == ∅)
+                       ∧
+                     (dlt-destruct d == Some ((k , v) , d') →
+                        k # d' ∧ d == d' ,, (k , v))
+    destruct-thm = destruct-thm-1 , destruct-thm-2
+
     -- A useful way to destruct delta dict membership
     dlt-split : {A : Set} {Γ : t A} {k1 k2 : Key} {a1 a2 : A} →
                   (k1 , a1) ∈ (Γ ,, (k2 , a2)) →
@@ -820,20 +834,7 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
       with dlt-delete' {A} {Γ} {N k} {a} h
     ... | _ , refl , # = _ , refl , #
 
-    -- Allows the delta dicts to be destructed, by removing an arbitrary item
-    dlt-elim : {A : Set} {Γ : t A} →
-                Γ == ∅
-                  ∨
-                Σ[ k ∈ Key ] Σ[ a ∈ A ] Σ[ Γ' ∈ t A ]
-                   (Γ == Γ' ,, (k , a) ∧ k # Γ')
-    dlt-elim {A} {TW Γ}
-      with dlt-elim' {A} {Γ}
-    ... | Inl refl = Inl refl
-    ... | Inr (n , _ , _ , refl , #)
-      with bij.surj bij n
-    ... | k , refl = Inr (_ , _ , _ , refl , #)
-
-    -- When using dlt-elim or dlt-delete, this theorem is useful for establishing termination
+    -- When using dlt-destruct or dlt-delete, this theorem is useful for establishing termination
     dlt-decreasing : {A : Set} {Γ : t A} {k : Key} {a : A} →
                       k # Γ →
                       || Γ ,, (k , a) || == 1+ || Γ ||
