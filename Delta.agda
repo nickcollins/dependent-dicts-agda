@@ -112,8 +112,8 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
     dltmap f (TW Γ) = TW <| map (λ {(hx , ha) → (hx , f ha)}) Γ
 
     -- TODO theorems
-    -- converts a list of key-value pairs into a delta dict, with later pairs in
-    -- the list overriding bindings defined by previous pairs
+    -- converts a list of key-value pairs into a delta dict, with earlier pairs in
+    -- the list overriding bindings defined by later pairs
     list⇒dlt : {A : Set} → List (Key ∧ A) → t A
 
     -- converts a delta dict into a list of key-value pairs; the inverse of list⇒dlt
@@ -624,7 +624,7 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
       dlt⇒list' ((x , a) :: Γ) = (x , a) :: map (λ {(x' , a') → x' + 1+ x , a'}) (dlt⇒list' Γ)
 
       list⇒dlt' : {A : Set} (Γ : rt A) → rt A
-      list⇒dlt' = foldl _,,'_ []
+      list⇒dlt' = foldr _,,'_ []
 
     union merge (TW Γ1) (TW Γ2) = TW <| union' merge Γ1 Γ2 0
 
@@ -643,7 +643,7 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
           ... | Inr k#Γ
             = TW Γ ,, (k , a :: [])
 
-    ---- union and dlt <=> list lemmas ----
+    ---- union, dlt <=> list, etc lemmas ----
 
     private
 
@@ -762,13 +762,44 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
         rewrite ! (undiff-1 x x2 x<x2+1+x)
           = lemma-dlt⇒list' {Γ = Γ}
 
+      dlt⇒list-size' : {V : Set} {d : rt V} → ∥ dlt⇒list' d ∥ == ∥ d ∥
+      dlt⇒list-size' {d = []} = refl
+      dlt⇒list-size' {d = _ :: d} = 1+ap (map-len · dlt⇒list-size')
+
+      dlt⇒list-In-1' : {V : Set} {d : rt V} {n : Nat} {v : V} →
+                         (n , v) ∈' d →
+                         (n , v) In dlt⇒list' d
+      dlt⇒list-In-1' InH = LInH
+      dlt⇒list-In-1' (InT ∈h) = LInT <| map-In <| dlt⇒list-In-1' ∈h
+
+      list⇒dlt-In' : {V : Set} {l : rt V} {n : Nat} {v : V} →
+                       (n , v) ∈' list⇒dlt' l →
+                       (n , v) In l
+      list⇒dlt-In' {l = (n' , v') :: l} {n} ∈h
+        rewrite foldl-++ {l1 = reverse l} {(n' , v') :: []} {_,,'_} {[]}
+        with natEQ n n'
+      ... | Inr ne   = LInT (list⇒dlt-In' (x∈Γ+→'x∈Γ ne ∈h))
+      ... | Inl refl
+        rewrite someinj <| (! <| lookup-cons-2' ∈h) · (lookup-cons-2' {n = n} {v'} <| x,v∈'Γ,,x,v {Γ = foldl _,,'_ [] (reverse l)})
+          = LInH
+
+      list⇒dlt-order' : {V : Set} {l1 l2 : rt V} {n : Nat} {v1 v2 : V} →
+                          (n , v1) ∈' (list⇒dlt' ((n , v1) :: l1 ++ ((n , v2) :: l2)))
+      list⇒dlt-order' {l1 = l1} {l2} {n} {v1} {v2}
+        rewrite foldl-++ {l1 = reverse (l1 ++ ((n , v2) :: l2))} {(n , v1) :: []} {_,,'_} {[]}
+          = x,v∈'Γ,,x,v {Γ = foldl _,,'_ [] <| reverse (l1 ++ ((n , v2) :: l2))}
+
+      -- TODO the other direction
       dlt⇒list-inversion' : {A : Set} {Γ : rt A} → list⇒dlt' (dlt⇒list' Γ) == Γ
+      dlt⇒list-inversion' = {!!}
+      {- TODO
       dlt⇒list-inversion' {Γ = []} = refl
       dlt⇒list-inversion' {Γ = (x , a) :: Γ}
         with dlt⇒list-inversion' {Γ = Γ}
       ... | rec
         = foldl-map {l = dlt⇒list' Γ} {_,,'_} {λ {(x' , a') → x' + 1+ x , a'}} {(x , a) :: []}
           · (lemma-dlt⇒list' {Γ = dlt⇒list' Γ} · ap1 (λ y → (x , a) :: y) rec)
+             -}
 
       dltmap-func' : {V1 V2 : Set} {d : rt V1} {f : V1 → V2} {n : Nat} {v : V1} →
                       (map (λ { (hx , ha) → hx , f ha }) (d ,,' (n , v)))
