@@ -49,6 +49,8 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
       rt : (A : Set) → Set
       rt A = List (Nat ∧ A)
 
+      ---- helper definitions ----
+
       _lkup_ : {A : Set} → rt A → Nat → Maybe A
       [] lkup x = None
       ((hx , ha) :: t) lkup x with <dec x hx
@@ -75,6 +77,8 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
 
       _#'_ : {A : Set} (n : Nat) → (Γ : rt A) → Set
       n #' Γ = dom' Γ n → ⊥
+
+      ---- lemmas ----
 
       undiff-1 : (x s : Nat) → (x<s+1+x : x < s + 1+ x) → s == diff-1 x<s+1+x
       undiff-1 x s x<s+1+x
