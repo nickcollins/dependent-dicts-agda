@@ -28,6 +28,7 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
   -- following line would be uncommented to ensure proper encapsulation
   -- abstract -- everything in the module is either abstract or private
 
+    ---- gory details - skip to "core definitions" ----
     private
       -- abbreviations for conversion between K and Nat
       K : Nat → Key
@@ -74,71 +75,6 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
 
       _#'_ : {A : Set} (n : Nat) → (Γ : rt A) → Set
       n #' Γ = dom' Γ n → ⊥
-
-    ---- the core declarations ----
-    -- TODO move definitions
-
-    data t (A : Set) : Set where
-      TW : rt A → t A
-
-    -- nil
-    ∅ : {A : Set} → t A
-    ∅ = TW []
-
-    -- singleton
-    ■_ : {A : Set} → (Key ∧ A) → t A
-    ■_ (k , a) = TW <| (N k , a) :: []
-
-    -- extension/insertion
-    _,,_ : ∀{A} → t A → (Key ∧ A) → t A
-    (TW Γ) ,, (k , a) = TW <| Γ ,,' (N k , a)
-
-    infixl 10 _,,_
-
-    -- membership
-    _∈_ : {A : Set} (p : Key ∧ A) → (Γ : t A) → Set
-    _∈_ {A} (k , a) (TW Γ) = _∈'_ {A} (N k , a) Γ
-
-    -- domain
-    dom : {A : Set} → t A → Key → Set
-    dom {A} (TW Γ) k = dom' {A} Γ (N k)
-
-    -- apartness, i.e. the opposite of dom
-    _#_ : {A : Set} (k : Key) → (Γ : t A) → Set
-    k # (TW Γ) = (N k) #' Γ
-
-    -- maps f across the values of the delta dict
-    dltmap : {A B : Set} → (A → B) → t A → t B
-    dltmap f (TW Γ) = TW <| map (λ {(hx , ha) → (hx , f ha)}) Γ
-
-    -- TODO theorems
-    -- converts a list of key-value pairs into a delta dict, with earlier pairs in
-    -- the list overriding bindings defined by later pairs
-    list⇒dlt : {A : Set} → List (Key ∧ A) → t A
-
-    -- converts a delta dict into a list of key-value pairs; the inverse of list⇒dlt
-    dlt⇒list : {A : Set} → t A → List (Key ∧ A)
-
-    -- TODO theorems
-    -- converts a list of key-value pairs into a multi-delta-dict, where each value of
-    -- the result is the sublist of values from the former that were mapped to by the
-    -- corresponding key
-    list⇒list-dlt : {A : Set} → List (Key ∧ A) → t (List A)
-
-    -- union merge A B is the union of A and B,
-    -- with (merge a b) being invoked to handle the mappings they have in common
-    union : {A : Set} → (A → A → A) → t A → t A → t A
-
-    -- lookup function
-    _⦃⦃_⦄⦄ : {A : Set} → t A → Key → Maybe A
-    (TW Γ) ⦃⦃ k ⦄⦄ = Γ lkup (N k)
-
-    ||_|| : {A : Set} → t A → Nat
-    || TW Γ || = ∥ Γ ∥
-
-    ---- lemmas ----
-
-    private
 
       undiff-1 : (x s : Nat) → (x<s+1+x : x < s + 1+ x) → s == diff-1 x<s+1+x
       undiff-1 x s x<s+1+x
@@ -415,170 +351,8 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
                              (m-n+n==m (n<m→1+n≤m n'<n))
                              (InT diff∈Γ))})
 
-    ---- core theorems ----
+      ---- contrapositives of some previous theorems ----
 
-    -- The next two theorems show that lookup (_⦃⦃_⦄⦄) is consistent with membership (_∈_)
-    lookup-cons-1 : {A : Set} {Γ : t A} {k : Key} {a : A} →
-                     Γ ⦃⦃ k ⦄⦄ == Some a →
-                     (k , a) ∈ Γ
-    lookup-cons-1 {A} {TW Γ} {k} {a} h = lookup-cons-1' {Γ = Γ} {N k} h
-
-    lookup-cons-2 : {A : Set} {Γ : t A} {k : Key} {a : A} →
-                     (k , a) ∈ Γ →
-                     Γ ⦃⦃ k ⦄⦄ == Some a
-    lookup-cons-2 {A} {TW Γ} {k} {a} = lookup-cons-2' {A} {Γ} {N k} {a}
-
-    -- membership (_∈_) respects insertion (_,,_)
-    k,v∈Γ,,k,v : {A : Set} {Γ : t A} {k : Key} {a : A} →
-                  (k , a) ∈ (Γ ,, (k , a))
-    k,v∈Γ,,k,v {A} {Γ = TW Γ} {k} = x,v∈'Γ,,x,v {Γ = Γ} {N k}
-
-    -- insertion can't generate spurious membership
-    k∈Γ+→k∈Γ : {A : Set} {Γ : t A} {k k' : Key} {a a' : A} →
-                 k ≠ k' →
-                 (k , a) ∈ (Γ ,, (k' , a')) →
-                 (k , a) ∈ Γ
-    k∈Γ+→k∈Γ {A} {Γ = TW Γ} {k} {k'} {a} {a'} ne h
-      = x∈Γ+→'x∈Γ {A} {Γ} {N k} {N k'} {a} {a'} (inj-cp ne) h
-
-    -- insertion respects membership
-    k∈Γ→k∈Γ+ : {A : Set} {Γ : t A} {k k' : Key} {a a' : A} →
-                 k ≠ k' →
-                 (k , a) ∈ Γ →
-                 (k , a) ∈ (Γ ,, (k' , a'))
-    k∈Γ→k∈Γ+ {A} {TW Γ} {k} {k'} {a} {a'} ne h
-      = x∈Γ→'x∈Γ+ {A} {Γ} {N k} {N k'} {a} {a'} (inj-cp ne) h
-
-    -- Decidability of membership
-    -- This also packages up an appeal to delta dict membership into a form that
-    -- lets us retain more information
-    dltindirect : {A : Set} (Γ : t A) (k : Key) → dom Γ k ∨ k # Γ
-    dltindirect {A} (TW Γ) k = dltindirect' {A} Γ (N k)
-
-    -- delta dicts give at most one binding for each variable
-    dltunicity : {A : Set} {Γ : t A} {k : Key} {a a' : A} →
-                   (k , a) ∈ Γ →
-                   (k , a') ∈ Γ →
-                   a == a'
-    dltunicity ah a'h
-      with lookup-cons-2 ah | lookup-cons-2 a'h
-    ... | ah' | a'h' = someinj (! ah' · a'h')
-
-    -- nothing is in nil
-    k#∅ : {A : Set} {k : Key} → _#_ {A} k ∅
-    k#∅ (_ , ())
-
-    -- meaning of the singleton
-    ■-def : {A : Set} {k : Key} {a : A} → (■ (k , a)) == ∅ ,, (k , a)
-    ■-def = refl
-
-    -- extensionality of Delta dicts
-    -- (i.e. if two dicts represent the same mapping from ids to values,
-    -- then they are reflexively equal as judged by _==_)
-    dlt-==-eqv : {A : Set} {Γ1 Γ2 : t A} →
-                  ((k : Key) → Γ1 ⦃⦃ k ⦄⦄ == Γ2 ⦃⦃ k ⦄⦄) →
-                  Γ1 == Γ2
-    dlt-==-eqv {A} {TW Γ1} {TW Γ2} all-bindings-==
-      = ap1 TW <| dlt-==-eqv' {A} {Γ1} {Γ2} eqv-nat
-        where
-        eqv-nat : (n : Nat) → (Γ1 lkup n) == (Γ2 lkup n)
-        eqv-nat n
-          with bij.surj bij n
-        ... | k , surj
-          with all-bindings-== k
-        ... | eq rewrite surj = eq
-
-    -- decidable equality of delta dicts
-    dlt-==-dec : {A : Set}
-                  (Γ1 Γ2 : t A) →
-                  ((a1 a2 : A) → a1 == a2 ∨ a1 ≠ a2) →
-                  Γ1 == Γ2 ∨ Γ1 ≠ Γ2
-    dlt-==-dec {A} (TW Γ1) (TW Γ2) h = dlt-==-dec' {A} Γ1 Γ2 h
-      where
-      dlt-==-dec' : {A : Set}
-                     (Γ1 Γ2 : rt A) →
-                     ((a1 a2 : A) → a1 == a2 ∨ a1 ≠ a2) →
-                     TW Γ1 == TW Γ2 ∨ TW Γ1 ≠ TW Γ2
-      dlt-==-dec' [] [] _ = Inl refl
-      dlt-==-dec' [] (_ :: _) _ = Inr (λ ())
-      dlt-==-dec' (_ :: _) [] _ = Inr (λ ())
-      dlt-==-dec' ((hx1 , ha1) :: t1) ((hx2 , ha2) :: t2) A==dec
-        with natEQ hx1 hx2 | A==dec ha1 ha2 | dlt-==-dec' t1 t2 A==dec
-      ... | Inl refl | Inl refl | Inl refl = Inl refl
-      ... | Inl refl | Inl refl | Inr ne   = Inr λ where refl → ne refl
-      ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
-      ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
-
-    -- A useful way to destruct delta dict membership
-    dlt-split : {A : Set} {Γ : t A} {k1 k2 : Key} {a1 a2 : A} →
-                  (k1 , a1) ∈ (Γ ,, (k2 , a2)) →
-                  (k1 ≠ k2 ∧ (k1 , a1) ∈ Γ) ∨ (k1 == k2 ∧ a1 == a2)
-    dlt-split {Γ = Γ} {k1} {k2} {a1} {a2} n∈Γ+
-      with natEQ (N k1) (N k2)
-    ... | Inl eq
-      rewrite bij.inj bij eq
-        = Inr (refl , dltunicity n∈Γ+ (k,v∈Γ,,k,v {Γ = Γ}))
-    ... | Inr ne = Inl (ne' , k∈Γ+→k∈Γ ne' n∈Γ+)
-            where
-            ne' = λ eq → abort (ne (ap1 N eq))
-
-    -- remove a specific mapping from a delta dict
-    dlt-delete : {A : Set} {Γ : t A} {k : Key} {a : A} →
-                  (k , a) ∈ Γ →
-                  Σ[ Γ⁻ ∈ t A ] (
-                     Γ == Γ⁻ ,, (k , a) ∧
-                     k # Γ⁻)
-    dlt-delete {A} {TW Γ} {k} {a} h
-      with dlt-delete' {A} {Γ} {N k} {a} h
-    ... | _ , refl , # = _ , refl , #
-
-    -- Allows the delta dicts to be destructed, by removing an arbitrary item
-    dlt-elim : {A : Set} {Γ : t A} →
-                Γ == ∅
-                  ∨
-                Σ[ k ∈ Key ] Σ[ a ∈ A ] Σ[ Γ' ∈ t A ]
-                   (Γ == Γ' ,, (k , a) ∧ k # Γ')
-    dlt-elim {A} {TW Γ}
-      with dlt-elim' {A} {Γ}
-    ... | Inl refl = Inl refl
-    ... | Inr (n , _ , _ , refl , #)
-      with bij.surj bij n
-    ... | k , refl = Inr (_ , _ , _ , refl , #)
-
-    -- When using dlt-elim or dlt-delete, this theorem is useful for establishing termination
-    dlt-decreasing : {A : Set} {Γ : t A} {k : Key} {a : A} →
-                      k # Γ →
-                      || Γ ,, (k , a) || == 1+ || Γ ||
-    dlt-decreasing {A} {TW Γ} {k} {a} n#Γ = dlt-decreasing' {A} {Γ} {N k} {a} n#Γ
-
-    ---- contrapositives of some previous theorems ----
-
-    {- TODO we should revive these if they are necessary or meaningful,
-            otherwise we should delete them. Even in constructive languages,
-            the CPs are usually true, right? So do they convey any real info?
-
-    x#Γ+→x#Γ : {A : Set} {Γ : A dlt} {x x' : Nat} {a' : A} →
-                 x # (Γ ,, (x' , a')) →
-                 x # Γ
-    x#Γ+→x#Γ {Γ = Γ} {x} {x'} {a'} x#Γ+
-      with dltindirect Γ x
-    ... | Inr x#Γ       = x#Γ
-    ... | Inl (_ , x∈Γ)
-      with natEQ x x'
-    ... | Inl refl = abort (x#Γ+ (_ , x,a∈Γ,,x,a {Γ = Γ}))
-    ... | Inr x≠x' = abort (x#Γ+ (_ , x∈Γ→x∈Γ+ x≠x' x∈Γ))
-
-    lookup-cp-2 : {A : Set} {Γ : A dlt} {x : Nat} →
-                   Γ ⦃⦃ x ⦄⦄ == None →
-                   x # Γ
-    lookup-cp-2 {Γ = Γ} {x} x#Γ
-    with dltindirect Γ x
-    ... | Inl (_ , x∈Γ) = abort (somenotnone ((! (lookup-cons-2 x∈Γ)) · x#Γ))
-    ... | Inr x#'Γ      = x#'Γ
-
-    -}
-
-    private
       lookup-dec' : {A : Set} (Γ : rt A) (n : Nat) →
                      Σ[ a ∈ A ] (Γ lkup n == Some a) ∨ Γ lkup n == None
       lookup-dec' Γ n
@@ -603,9 +377,7 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
       ... | Inl (_ , x∈Γ+) = abort (x#Γ (_ , x∈Γ+→'x∈Γ x≠x' x∈Γ+))
       ... | Inr x#Γ+       = x#Γ+
 
-    ---- remaining definitions ----
-
-    private
+      ---- union, and dlt <=> list conversion definitions
 
       merge' : {A : Set} → (A → A → A) → Maybe A → A → A
       merge' merge ma1 a2
@@ -626,26 +398,7 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
       list⇒dlt' : {A : Set} (Γ : rt A) → rt A
       list⇒dlt' = foldr _,,'_ []
 
-    union merge (TW Γ1) (TW Γ2) = TW <| union' merge Γ1 Γ2 0
-
-    list⇒dlt Γ = Γ |> map (λ where (k , v) → (N k , v)) |> list⇒dlt' |> TW
-
-    dlt⇒list (TW Γ) = dlt⇒list' Γ |> map (λ where (n , v) → (K n , v))
-
-    list⇒list-dlt {A} l
-      = foldl f ∅ (reverse l)
-        where
-          f : t (List A) → Key ∧ A → t (List A)
-          f (TW Γ) (k , a)
-            with dltindirect (TW Γ) k
-          ... | Inl (as , k∈Γ)
-            = TW Γ ,, (k , a :: as)
-          ... | Inr k#Γ
-            = TW Γ ,, (k , a :: [])
-
-    ---- union, dlt <=> list, etc lemmas ----
-
-    private
+      ---- union, dlt <=> list, etc lemmas ----
 
       lemma-union'-0 : {A : Set} {m : A → A → A} {Γ1 Γ2 : rt A} {x n : Nat} {a : A} →
                         (x , a) ∈' Γ1 →
@@ -881,6 +634,220 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
           ... | x#Γ++1 | x#Γ++2
             rewrite lookup-cp-1' x#Γ++1 | lookup-cp-1' x#Γ++2 = refl
 
+    ---- core definitions ----
+
+    data t (A : Set) : Set where
+      TW : rt A → t A
+
+    -- nil
+    ∅ : {A : Set} → t A
+    ∅ = TW []
+
+    -- singleton
+    ■_ : {A : Set} → (Key ∧ A) → t A
+    ■_ (k , a) = TW <| (N k , a) :: []
+
+    -- extension/insertion
+    _,,_ : ∀{A} → t A → (Key ∧ A) → t A
+    (TW Γ) ,, (k , a) = TW <| Γ ,,' (N k , a)
+
+    infixl 10 _,,_
+
+    -- membership
+    _∈_ : {A : Set} (p : Key ∧ A) → (Γ : t A) → Set
+    _∈_ {A} (k , a) (TW Γ) = _∈'_ {A} (N k , a) Γ
+
+    -- domain
+    dom : {A : Set} → t A → Key → Set
+    dom {A} (TW Γ) k = dom' {A} Γ (N k)
+
+    -- apartness, i.e. the opposite of dom
+    _#_ : {A : Set} (k : Key) → (Γ : t A) → Set
+    k # (TW Γ) = (N k) #' Γ
+
+    -- maps f across the values of the delta dict
+    dltmap : {A B : Set} → (A → B) → t A → t B
+    dltmap f (TW Γ) = TW <| map (λ {(hx , ha) → (hx , f ha)}) Γ
+
+    -- TODO theorems
+    -- converts a list of key-value pairs into a delta dict, with earlier pairs in
+    -- the list overriding bindings defined by later pairs
+    list⇒dlt : {A : Set} → List (Key ∧ A) → t A
+    list⇒dlt Γ = Γ |> map (λ where (k , v) → (N k , v)) |> list⇒dlt' |> TW
+
+    -- converts a delta dict into a list of key-value pairs; the inverse of list⇒dlt
+    dlt⇒list : {A : Set} → t A → List (Key ∧ A)
+    dlt⇒list (TW Γ) = dlt⇒list' Γ |> map (λ where (n , v) → (K n , v))
+
+    -- TODO theorems
+    -- TODO we declare this here, but don't define it til later, due to a dependency.
+    --      Ideally we should refactor so that the dependency is hidden in the private section
+    -- converts a list of key-value pairs into a multi-delta-dict, where each value of
+    -- the result is the sublist of values from the former that were mapped to by the
+    -- corresponding key
+    list⇒list-dlt : {A : Set} → List (Key ∧ A) → t (List A)
+
+    -- union merge A B is the union of A and B,
+    -- with (merge a b) being invoked to handle the mappings they have in common
+    union : {A : Set} → (A → A → A) → t A → t A → t A
+    union merge (TW Γ1) (TW Γ2) = TW <| union' merge Γ1 Γ2 0
+
+    -- lookup function
+    _⦃⦃_⦄⦄ : {A : Set} → t A → Key → Maybe A
+    (TW Γ) ⦃⦃ k ⦄⦄ = Γ lkup (N k)
+
+    ||_|| : {A : Set} → t A → Nat
+    || TW Γ || = ∥ Γ ∥
+
+    ---- core theorems ----
+
+    -- The next two theorems show that lookup (_⦃⦃_⦄⦄) is consistent with membership (_∈_)
+    lookup-cons-1 : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                     Γ ⦃⦃ k ⦄⦄ == Some a →
+                     (k , a) ∈ Γ
+    lookup-cons-1 {A} {TW Γ} {k} {a} h = lookup-cons-1' {Γ = Γ} {N k} h
+
+    lookup-cons-2 : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                     (k , a) ∈ Γ →
+                     Γ ⦃⦃ k ⦄⦄ == Some a
+    lookup-cons-2 {A} {TW Γ} {k} {a} = lookup-cons-2' {A} {Γ} {N k} {a}
+
+    -- membership (_∈_) respects insertion (_,,_)
+    k,v∈Γ,,k,v : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                  (k , a) ∈ (Γ ,, (k , a))
+    k,v∈Γ,,k,v {A} {Γ = TW Γ} {k} = x,v∈'Γ,,x,v {Γ = Γ} {N k}
+
+    -- insertion can't generate spurious membership
+    k∈Γ+→k∈Γ : {A : Set} {Γ : t A} {k k' : Key} {a a' : A} →
+                 k ≠ k' →
+                 (k , a) ∈ (Γ ,, (k' , a')) →
+                 (k , a) ∈ Γ
+    k∈Γ+→k∈Γ {A} {Γ = TW Γ} {k} {k'} {a} {a'} ne h
+      = x∈Γ+→'x∈Γ {A} {Γ} {N k} {N k'} {a} {a'} (inj-cp ne) h
+
+    -- insertion respects membership
+    k∈Γ→k∈Γ+ : {A : Set} {Γ : t A} {k k' : Key} {a a' : A} →
+                 k ≠ k' →
+                 (k , a) ∈ Γ →
+                 (k , a) ∈ (Γ ,, (k' , a'))
+    k∈Γ→k∈Γ+ {A} {TW Γ} {k} {k'} {a} {a'} ne h
+      = x∈Γ→'x∈Γ+ {A} {Γ} {N k} {N k'} {a} {a'} (inj-cp ne) h
+
+    -- Decidability of membership
+    -- This also packages up an appeal to delta dict membership into a form that
+    -- lets us retain more information
+    dltindirect : {A : Set} (Γ : t A) (k : Key) → dom Γ k ∨ k # Γ
+    dltindirect {A} (TW Γ) k = dltindirect' {A} Γ (N k)
+
+    -- delta dicts give at most one binding for each variable
+    dltunicity : {A : Set} {Γ : t A} {k : Key} {a a' : A} →
+                   (k , a) ∈ Γ →
+                   (k , a') ∈ Γ →
+                   a == a'
+    dltunicity ah a'h
+      with lookup-cons-2 ah | lookup-cons-2 a'h
+    ... | ah' | a'h' = someinj (! ah' · a'h')
+
+    -- nothing is in nil
+    k#∅ : {A : Set} {k : Key} → _#_ {A} k ∅
+    k#∅ (_ , ())
+
+    -- meaning of the singleton
+    ■-def : {A : Set} {k : Key} {a : A} → (■ (k , a)) == ∅ ,, (k , a)
+    ■-def = refl
+
+    -- extensionality of Delta dicts
+    -- (i.e. if two dicts represent the same mapping from ids to values,
+    -- then they are reflexively equal as judged by _==_)
+    dlt-==-eqv : {A : Set} {Γ1 Γ2 : t A} →
+                  ((k : Key) → Γ1 ⦃⦃ k ⦄⦄ == Γ2 ⦃⦃ k ⦄⦄) →
+                  Γ1 == Γ2
+    dlt-==-eqv {A} {TW Γ1} {TW Γ2} all-bindings-==
+      = ap1 TW <| dlt-==-eqv' {A} {Γ1} {Γ2} eqv-nat
+        where
+        eqv-nat : (n : Nat) → (Γ1 lkup n) == (Γ2 lkup n)
+        eqv-nat n
+          with bij.surj bij n
+        ... | k , surj
+          with all-bindings-== k
+        ... | eq rewrite surj = eq
+
+    -- decidable equality of delta dicts
+    dlt-==-dec : {A : Set}
+                  (Γ1 Γ2 : t A) →
+                  ((a1 a2 : A) → a1 == a2 ∨ a1 ≠ a2) →
+                  Γ1 == Γ2 ∨ Γ1 ≠ Γ2
+    dlt-==-dec {A} (TW Γ1) (TW Γ2) h = dlt-==-dec' {A} Γ1 Γ2 h
+      where
+      dlt-==-dec' : {A : Set}
+                     (Γ1 Γ2 : rt A) →
+                     ((a1 a2 : A) → a1 == a2 ∨ a1 ≠ a2) →
+                     TW Γ1 == TW Γ2 ∨ TW Γ1 ≠ TW Γ2
+      dlt-==-dec' [] [] _ = Inl refl
+      dlt-==-dec' [] (_ :: _) _ = Inr (λ ())
+      dlt-==-dec' (_ :: _) [] _ = Inr (λ ())
+      dlt-==-dec' ((hx1 , ha1) :: t1) ((hx2 , ha2) :: t2) A==dec
+        with natEQ hx1 hx2 | A==dec ha1 ha2 | dlt-==-dec' t1 t2 A==dec
+      ... | Inl refl | Inl refl | Inl refl = Inl refl
+      ... | Inl refl | Inl refl | Inr ne   = Inr λ where refl → ne refl
+      ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
+      ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
+
+    -- A useful way to destruct delta dict membership
+    dlt-split : {A : Set} {Γ : t A} {k1 k2 : Key} {a1 a2 : A} →
+                  (k1 , a1) ∈ (Γ ,, (k2 , a2)) →
+                  (k1 ≠ k2 ∧ (k1 , a1) ∈ Γ) ∨ (k1 == k2 ∧ a1 == a2)
+    dlt-split {Γ = Γ} {k1} {k2} {a1} {a2} n∈Γ+
+      with natEQ (N k1) (N k2)
+    ... | Inl eq
+      rewrite bij.inj bij eq
+        = Inr (refl , dltunicity n∈Γ+ (k,v∈Γ,,k,v {Γ = Γ}))
+    ... | Inr ne = Inl (ne' , k∈Γ+→k∈Γ ne' n∈Γ+)
+            where
+            ne' = λ eq → abort (ne (ap1 N eq))
+
+    -- remove a specific mapping from a delta dict
+    dlt-delete : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                  (k , a) ∈ Γ →
+                  Σ[ Γ⁻ ∈ t A ] (
+                     Γ == Γ⁻ ,, (k , a) ∧
+                     k # Γ⁻)
+    dlt-delete {A} {TW Γ} {k} {a} h
+      with dlt-delete' {A} {Γ} {N k} {a} h
+    ... | _ , refl , # = _ , refl , #
+
+    -- Allows the delta dicts to be destructed, by removing an arbitrary item
+    dlt-elim : {A : Set} {Γ : t A} →
+                Γ == ∅
+                  ∨
+                Σ[ k ∈ Key ] Σ[ a ∈ A ] Σ[ Γ' ∈ t A ]
+                   (Γ == Γ' ,, (k , a) ∧ k # Γ')
+    dlt-elim {A} {TW Γ}
+      with dlt-elim' {A} {Γ}
+    ... | Inl refl = Inl refl
+    ... | Inr (n , _ , _ , refl , #)
+      with bij.surj bij n
+    ... | k , refl = Inr (_ , _ , _ , refl , #)
+
+    -- When using dlt-elim or dlt-delete, this theorem is useful for establishing termination
+    dlt-decreasing : {A : Set} {Γ : t A} {k : Key} {a : A} →
+                      k # Γ →
+                      || Γ ,, (k , a) || == 1+ || Γ ||
+    dlt-decreasing {A} {TW Γ} {k} {a} n#Γ = dlt-decreasing' {A} {Γ} {N k} {a} n#Γ
+
+    ---- contraction and exchange ----
+
+    contraction : {A : Set} {Γ : t A} {k : Key} {a a' : A} →
+                   Γ ,, (k , a') ,, (k , a) == Γ ,, (k , a)
+    contraction {A} {TW Γ} {k} {a} {a'}
+      = ap1 TW <| contraction' {Γ = Γ} {N k} {a} {a'}
+
+    exchange : {A : Set} {Γ : t A} {k1 k2 : Key} {a1 a2 : A} →
+                k1 ≠ k2 →
+                Γ ,, (k1 , a1) ,, (k2 , a2) == Γ ,, (k2 , a2) ,, (k1 , a1)
+    exchange {A} {TW Γ} {k1} {k2} {a1} {a2} k1≠k2
+      = ap1 TW <| exchange' {Γ = Γ} <| inj-cp k1≠k2
+
     ---- union theorems ----
 
     x,a∈Γ1→x∉Γ2→x,a∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : t A} {k : Key} {a : A} →
@@ -918,6 +885,25 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
     x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 x∈Γ1∪Γ2 | Inl x'∈Γ1 = Inl x'∈Γ1
     x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 x∈Γ1∪Γ2 | Inr (_ , refl , x'∈Γ2) = Inr x'∈Γ2
 
+    ---- dltmap theorem ----
+
+    dltmap-func : {V1 V2 : Set} {d : t V1} {f : V1 → V2} {k : Key} {v : V1} →
+                   dltmap f (d ,, (k , v)) == dltmap f d ,, (k , f v)
+    dltmap-func {d = TW d} {f} {k} {v} = ap1 TW (dltmap-func' {d = d})
+
+    ---- remaining definition, list⇒list-dlt ----
+
+    list⇒list-dlt {A} l
+      = foldl f ∅ (reverse l)
+        where
+          f : t (List A) → Key ∧ A → t (List A)
+          f (TW Γ) (k , a)
+            with dltindirect (TW Γ) k
+          ... | Inl (as , k∈Γ)
+            = TW Γ ,, (k , a :: as)
+          ... | Inr k#Γ
+            = TW Γ ,, (k , a :: [])
+
     ---- dlt <=> list theorems ----
 
     dlt⇒list-inversion : {A : Set} {Γ : t A} → list⇒dlt (dlt⇒list Γ) == Γ
@@ -937,22 +923,3 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
                      (dlt⇒list' Γ)))
               == TW Γ
         lem rewrite lem' {dlt⇒list' Γ} = ap1 TW dlt⇒list-inversion'
-
-    ---- dltmap theorem ----
-
-    dltmap-func : {V1 V2 : Set} {d : t V1} {f : V1 → V2} {k : Key} {v : V1} →
-                   dltmap f (d ,, (k , v)) == dltmap f d ,, (k , f v)
-    dltmap-func {d = TW d} {f} {k} {v} = ap1 TW (dltmap-func' {d = d})
-
-    ---- contraction and exchange ----
-
-    contraction : {A : Set} {Γ : t A} {k : Key} {a a' : A} →
-                   Γ ,, (k , a') ,, (k , a) == Γ ,, (k , a)
-    contraction {A} {TW Γ} {k} {a} {a'}
-      = ap1 TW <| contraction' {Γ = Γ} {N k} {a} {a'}
-
-    exchange : {A : Set} {Γ : t A} {k1 k2 : Key} {a1 a2 : A} →
-                k1 ≠ k2 →
-                Γ ,, (k1 , a1) ,, (k2 , a2) == Γ ,, (k2 , a2) ,, (k1 , a1)
-    exchange {A} {TW Γ} {k1} {k2} {a1} {a2} k1≠k2
-      = ap1 TW <| exchange' {Γ = Γ} <| inj-cp k1≠k2
