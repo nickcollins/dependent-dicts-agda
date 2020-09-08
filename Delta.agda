@@ -107,7 +107,6 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
     _#_ : {A : Set} (k : Key) → (Γ : t A) → Set
     k # (TW Γ) = (N k) #' Γ
 
-    -- TODO theorems
     -- maps f across the values of the delta dict
     dltmap : {A B : Set} → (A → B) → t A → t B
     dltmap f (TW Γ) = TW <| map (λ {(hx , ha) → (hx , f ha)}) Γ
@@ -778,6 +777,17 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
         = foldl-map {l = dlt⇒list' Γ} {_,,'_} {λ {(x' , a') → x' + 1+ x , a'}} {(x , a) :: []}
           · (lemma-dlt⇒list' {Γ = dlt⇒list' Γ} · ap1 (λ y → (x , a) :: y) rec)
 
+      dltmap-func' : {V1 V2 : Set} {d : rt V1} {f : V1 → V2} {n : Nat} {v : V1} →
+                      (map (λ { (hx , ha) → hx , f ha }) (d ,,' (n , v)))
+                        ==
+                      (map (λ { (hx , ha) → hx , f ha }) d ,,' (n , f v))
+      dltmap-func' {d = []} = refl
+      dltmap-func' {d = (nh , vh) :: d} {f = f} {n}
+        with <dec n nh
+      ... | Inl n<nh       = refl
+      ... | Inr (Inl refl) = refl
+      ... | Inr (Inr nh<n) = ap1 ((nh , f vh) ::_) (dltmap-func' {d = d})
+
       -- TODO these proofs could use refactoring -
       -- contraction should probably make use of dlt-==-dec and
       -- exchange is way too long and repetitive
@@ -903,6 +913,12 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
                      (dlt⇒list' Γ)))
               == TW Γ
         lem rewrite lem' {dlt⇒list' Γ} = ap1 TW dlt⇒list-inversion'
+
+    ---- dltmap theorem ----
+
+    dltmap-func : {V1 V2 : Set} {d : t V1} {f : V1 → V2} {k : Key} {v : V1} →
+                   dltmap f (d ,, (k , v)) == dltmap f d ,, (k , f v)
+    dltmap-func {d = TW d} {f} {k} {v} = ap1 TW (dltmap-func' {d = d})
 
     ---- contraction and exchange ----
 
