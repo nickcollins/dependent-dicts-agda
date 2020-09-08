@@ -112,9 +112,6 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
     dltmap f (TW Γ) = TW <| map (λ {(hx , ha) → (hx , f ha)}) Γ
 
     -- TODO theorems
-    -- returns a list of the values stored in the delta dict
-    dlt⇒values : {A : Set} → t A → List A
-
     -- converts a list of key-value pairs into a delta dict, with later pairs in
     -- the list overriding bindings defined by previous pairs
     list⇒dlt : {A : Set} → List (Key ∧ A) → t A
@@ -517,8 +514,6 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
                   (k1 , a1) ∈ (Γ ,, (k2 , a2)) →
                   (k1 ≠ k2 ∧ (k1 , a1) ∈ Γ) ∨ (k1 == k2 ∧ a1 == a2)
     dlt-split {Γ = Γ} {k1} {k2} {a1} {a2} n∈Γ+
-    --  with expr-eq (λ _ → N k1) | expr-eq (λ _ → N k2)
-    --... | n1 , refl | n2 , refl = {!!}
       with natEQ (N k1) (N k2)
     ... | Inl eq
       rewrite bij.inj bij eq
@@ -636,8 +631,6 @@ module Delta (Key : Set) {{bij : bij Key Nat}} where
     list⇒dlt Γ = Γ |> map (λ where (k , v) → (N k , v)) |> list⇒dlt' |> TW
 
     dlt⇒list (TW Γ) = dlt⇒list' Γ |> map (λ where (n , v) → (K n , v))
-
-    dlt⇒values (TW Γ) = map π2 Γ
 
     list⇒list-dlt {A} l
       = foldl f ∅ (reverse l)
