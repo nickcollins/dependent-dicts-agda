@@ -24,9 +24,9 @@ open import Bij
 -- * l⟦ i ⟧ is used to (maybe) get the ith element of list l
 -- * ∥ l ∥ is the length of a list
 module Delta (Key : Set) {{bij : bij Key Nat}} where
-  -- the 'abstract' keyword is buggy, so we can't use it, but ideally, the
-  -- following line would be uncommented to ensure proper encapsulation
-  -- abstract -- everything in the module is either abstract or private
+  -- Agda 2.6.1 has some bugs involving the 'abstract' keyword, so we can't use it, but ideally,
+  -- the following line would be uncommented to ensure proper encapsulation
+  -- abstract -- everything in the module is abstract
 
     ---- gory details - skip to "core definitions" ----
     private
