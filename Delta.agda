@@ -676,14 +676,6 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     dlt⇒list : {V : Set} → dd V → List (K ∧ V)
     dlt⇒list (DD d) = dlt⇒list' d |> map (λ where (n , v) → (key n , v))
 
-    -- TODO theorems
-    -- TODO we declare this here, but don't define it til later, due to a dependency.
-    --      Ideally we should refactor so that the dependency is hidden in the private section
-    -- converts a list of key-value pairs into a multi-delta-dict, where each value of
-    -- the result is the sublist of values from the former that were mapped to by the
-    -- corresponding key
-    list⇒list-dlt : {V : Set} → List (K ∧ V) → dd (List V)
-
     -- union merge A B is the union of A and B,
     -- with (merge a b) being invoked to handle the mappings they have in common
     union : {V : Set} → (V → V → V) → dd V → dd V → dd V
@@ -888,19 +880,6 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     dltmap-func : {V1 V2 : Set} {d : dd V1} {f : V1 → V2} {k : K} {v : V1} →
                    dltmap f (d ,, (k , v)) == dltmap f d ,, (k , f v)
     dltmap-func {d = DD d} {f} {k} {v} = ap1 DD (dltmap-func' {d = d})
-
-    ---- remaining definition, list⇒list-dlt ----
-
-    list⇒list-dlt {V} l
-      = foldl f ∅ (reverse l)
-        where
-          f : dd (List V) → K ∧ V → dd (List V)
-          f (DD d) (k , v)
-            with mem-dec (DD d) k
-          ... | Inl (vs , k∈d)
-            = DD d ,, (k , v :: vs)
-          ... | Inr k#d
-            = DD d ,, (k , v :: [])
 
     ---- dlt <=> list theorems ----
 
