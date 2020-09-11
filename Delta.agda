@@ -817,20 +817,6 @@ module Delta (K : Set) {{bij : bij K Nat}} where
                         k # d' ∧ d == d' ,, (k , v))
     destruct-thm = destruct-thm-1 , destruct-thm-2
 
-    -- TODO delete
-    -- A useful way to destruct delta dict membership
-    dlt-split : {V : Set} {d : dd V} {k1 k2 : K} {a1 a2 : V} →
-                  (k1 , a1) ∈ (d ,, (k2 , a2)) →
-                  (k1 ≠ k2 ∧ (k1 , a1) ∈ d) ∨ (k1 == k2 ∧ a1 == a2)
-    dlt-split {d = d} {k1} {k2} {a1} {a2} n∈d+
-      with natEQ (nat k1) (nat k2)
-    ... | Inl eq
-      rewrite bij.inj bij eq
-        = Inr (refl , mem-unicity n∈d+ (k,v∈d,,k,v {d = d}))
-    ... | Inr ne = Inl (ne' , k∈d+→k∈d ne' n∈d+)
-            where
-            ne' = λ eq → abort (ne (ap1 nat eq))
-
     -- When using destruct or delete, this theorem is useful for establishing termination
     extend-size : {V : Set} {d : dd V} {k : K} {v : V} →
                    k # d →
