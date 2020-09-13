@@ -96,6 +96,9 @@ module Nat where
   +inj {a1} {a2} {1+ b} h
     rewrite n+1+m==1+n+m {a1} {b} | n+1+m==1+n+m {a2} {b} = +inj (1+inj h)
 
+  +inj-cp : ∀{a1 a2 b} → a1 ≠ a2 → a1 + b ≠ a2 + b
+  +inj-cp ne f = ne (+inj f)
+
   -- even/odd theorems
 
   even-inj : ∀{m n} → m + m == n + n → m == n
@@ -120,6 +123,12 @@ module Nat where
   n≤m→1+n≤1+m : ∀{n m} → n ≤ m → 1+ n ≤ 1+ m
   n≤m→1+n≤1+m {n} {.n} ≤refl = ≤refl
   n≤m→1+n≤1+m {n} {.(1+ _)} (≤1+ h) = ≤1+ (n≤m→1+n≤1+m h)
+
+  n≤m→s+n=m : ∀{n m} → n ≤ m → Σ[ s ∈ Nat ] (s + n == m)
+  n≤m→s+n=m ≤refl = Z , refl
+  n≤m→s+n=m (≤1+ n≤m)
+    with n≤m→s+n=m n≤m
+  ... | _ , refl = _ , refl
 
   1+n≤1+m→n≤m : ∀{n m} → 1+ n ≤ 1+ m → n ≤ m
   1+n≤1+m→n≤m {n} {.n} ≤refl = ≤refl
@@ -194,6 +203,12 @@ module Nat where
 
   n<m→1+n<1+m : ∀{n m} → n < m → 1+ n < 1+ m
   n<m→1+n<1+m (π3 , π4) = n≤m→1+n≤1+m π3 , 1+inj-cp π4
+
+  n<m→s+1+n=m : ∀{n m} → n < m → Σ[ s ∈ Nat ] (s + 1+ n == m)
+  n<m→s+1+n=m (≤refl , ne) = abort (ne refl)
+  n<m→s+1+n=m {n = n} (≤1+ n≤m , _)
+    with n≤m→s+n=m n≤m
+  ... | _ , refl = _ , (n+1+m==1+n+m {m = n})
 
   0<1+n : ∀{n} → 0 < 1+ n
   0<1+n {Z} = ≤1+ ≤refl , (λ ())
