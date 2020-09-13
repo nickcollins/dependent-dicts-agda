@@ -506,6 +506,55 @@ module Delta (K : Set) {{bij : bij K Nat}} where
       dlt⇒list-In-1' InH = LInH
       dlt⇒list-In-1' (InT ∈h) = LInT <| map-In <| dlt⇒list-In-1' ∈h
 
+      too-small-list : {V : Set} {d : dl V} {m m' : Nat} {v : V} →
+                        m ≤ m' →
+                        (m , v) In (map (λ { (n'' , v'') → n'' + 1+ m' , v'' }) (dlt⇒list' d)) →
+                        ⊥
+      too-small-list {d = (n2 , v2) :: d} n≤n' LInH
+        = abort (lemma-math' {x1 = Z} (≤antisym (≤trans n≤m+n (n≤m+n {m = n2})) n≤n'))
+      too-small-list {d = (n2 , v2) :: d} {m} {m'} {v} m≤m' (LInT in')
+        = too-small-list (≤trans m≤m' (≤trans n≤m+n (n≤m+n {m = n2}))) rec-in
+        where
+          rec-in =
+            tr
+              (λ y → (m , v) In y)
+              (map^2
+                 {f = (λ { (n'' , v'') → n'' + 1+ m' , v'' })}
+                 {(λ { (n'' , v'') → n'' + 1+ n2 , v'' })}
+                 {dlt⇒list' d}
+               ·
+               map-ext (λ where (n'' , v'') → ap1 (λ y' → y' , v'') <| +assc {n''} {b = 1+ n2} {c = 1+ m'}))
+              in'
+
+      dlt⇒list-In-2' : {V : Set} {d : dl V} {n : Nat} {v : V} →
+                         (n , v) In dlt⇒list' d →
+                         (n , v) ∈' d
+      dlt⇒list-In-2' {d = _ :: d} LInH = InH
+      dlt⇒list-In-2' {d = (n' , v') :: d} {n} (LInT in')
+        with <dec n n'
+      ... | Inl n<n'       = abort (too-small-list (π1 n<n') in')
+      ... | Inr (Inl refl) = abort (too-small-list ≤refl in')
+      ... | Inr (Inr n'<n)
+        with n<m→s+1+n=m n'<n
+      ... | _ , refl = InT (dlt⇒list-In-2' (lem2 in'))
+        where
+          lem1 : ∀{V l} {m1 m2 : Nat} {vv1 vv2 : V} →
+                   m1 ≠ m2 →
+                   (in'' : (m1 , vv1) In ((m2 , vv2) :: l)) →
+                   Σ[ in2 ∈ ((m1 , vv1) In l) ] (in'' == LInT in2)
+          lem1 ne LInH = abort (ne refl)
+          lem1 ne (LInT in'') = in'' , refl
+          lem2 : ∀{V s l} {vv : V} →
+                   (s + 1+ n' , vv) In map (λ { (n'' , v'') → n'' + 1+ n' , v'' }) l →
+                   (s , vv) In l
+          lem2 {s = s} {(n2 , v2) :: l} in''
+            with natEQ s n2
+          lem2 {s = s} {(s , v2) :: l} LInH        | Inl refl = LInH
+          lem2 {s = s} {(s , v2) :: l} (LInT in'') | Inl refl = LInT (lem2 in'')
+          ... | Inr ne
+            with lem1 (+inj-cp ne) in''
+          ... | in2 , refl = LInT (lem2 in2)
+
       list⇒dlt-In' : {V : Set} {l : dl V} {n : Nat} {v : V} →
                       (n , v) ∈' list⇒dlt' l →
                       (n , v) In l
@@ -882,6 +931,28 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     dltmap-func {d = DD d} {f} {k} {v} = ap1 DD (dltmap-func' {d = d})
 
     ---- dlt <=> list theorems ----
+
+    dlt⇒list-size : {V : Set} {d : dd V} → ∥ dlt⇒list d ∥ == || d ||
+    dlt⇒list-size {d = DD d} = map-len · dlt⇒list-size'
+
+    dlt⇒list-In-1 : {V : Set} {d : dl V} {n : Nat} {v : V} →
+                     (n , v) ∈' d →
+                     (n , v) In dlt⇒list' d
+    dlt⇒list-In-1 = dlt⇒list-In-1'
+
+    dlt⇒list-In-2 : {V : Set} {d : dl V} {n : Nat} {v : V} →
+                      (n , v) In dlt⇒list' d →
+                      (n , v) ∈' d
+    dlt⇒list-In-2 = dlt⇒list-In-2'
+
+    list⇒dlt-In : {V : Set} {l : dl V} {n : Nat} {v : V} →
+                   (n , v) ∈' list⇒dlt' l →
+                   (n , v) In l
+    list⇒dlt-In = list⇒dlt-In'
+
+    list⇒dlt-order : {V : Set} {l1 l2 : dl V} {n : Nat} {v1 v2 : V} →
+                      (n , v1) ∈' (list⇒dlt' ((n , v1) :: l1 ++ ((n , v2) :: l2)))
+    list⇒dlt-order {l1 = l1} {l2} {v1} = list⇒dlt-order' {l1 = l1} {l2} {v1}
 
     dlt⇒list-inversion : {V : Set} {d : dd V} → list⇒dlt (dlt⇒list d) == d
     dlt⇒list-inversion {V} {DD d}
