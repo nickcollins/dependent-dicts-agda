@@ -479,23 +479,6 @@ module Delta (K : Set) {{bij : bij K Nat}} where
         rewrite +comm {x1} {n}
           = Inl (_ , n∈d+→'n∈d x≠n+x1 x∈d1+)
 
-      lemma-dlt⇒list' : {V : Set} {d d' : dl V} {n : Nat} {v : V} →
-                         foldl
-                           (λ {b (n' , v') → b ,,' (n' + 1+ n , v')})
-                           ((n , v) :: d')
-                           d
-                         == ((n , v) :: (foldl _,,'_ d' d))
-      lemma-dlt⇒list' {d = []} = refl
-      lemma-dlt⇒list' {d = (n2 , v2) :: d} {n = n}
-        with <dec (n2 + 1+ n) n
-      ... | Inl n2+1+n<n
-        = abort (<antisym n2+1+n<n (n<m→n<s+m n<1+n))
-      ... | Inr (Inl n2+1+n=n)
-        = abort ((flip n≠n+1+m) (n+1+m==1+n+m · (+comm {1+ n} · n2+1+n=n)))
-      ... | Inr (Inr n<n2+1+n)
-        rewrite ! (undelta n n2 n<n2+1+n)
-          = lemma-dlt⇒list' {d = d}
-
       dlt⇒list-size' : {V : Set} {d : dl V} → ∥ dlt⇒list' d ∥ == ∥ d ∥
       dlt⇒list-size' {d = []} = refl
       dlt⇒list-size' {d = _ :: d} = 1+ap (map-len · dlt⇒list-size')
@@ -577,18 +560,6 @@ module Delta (K : Set) {{bij : bij K Nat}} where
 
       bij-pair-2 : {V : Set} (kv : K ∧ V) → (key <| nat <| π1 kv , π2 kv) == kv
       bij-pair-2 (k , v) rewrite convert-bij1 {f = k} = refl
-
-      -- TODO the other direction
-      dlt⇒list-inversion' : {V : Set} {d : dl V} → list⇒dlt' (dlt⇒list' d) == d
-      dlt⇒list-inversion' = {!!}
-      {- TODO
-      dlt⇒list-inversion' {d = []} = refl
-      dlt⇒list-inversion' {d = (x , a) :: d}
-        with dlt⇒list-inversion' {d = d}
-      ... | rec
-        = foldl-map {l = dlt⇒list' d} {_,,'_} {λ {(x' , a') → x' + 1+ x , a'}} {(x , a) :: []}
-          · (lemma-dlt⇒list' {d = dlt⇒list' d} · ap1 (λ y → (x , a) :: y) rec)
-             -}
 
       dltmap-func' : {V1 V2 : Set} {d : dl V1} {f : V1 → V2} {n : Nat} {v : V1} →
                       (map (λ { (hn , hv) → hn , f hv }) (d ,,' (n , v)))
@@ -721,9 +692,6 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     dltmap : {A B : Set} → (A → B) → dd A → dd B
     dltmap f (DD d) = DD <| map (λ {(hn , hv) → (hn , f hv)}) d
 
-    -- TODO theorems
-    -- converts a list of key-value pairs into a delta dict, with earlier pairs in
-    -- the list overriding bindings defined by later pairs
     list⇒dlt : {V : Set} → List (K ∧ V) → dd V
     list⇒dlt d = d |> map (λ where (k , v) → (nat k , v)) |> list⇒dlt' |> DD
 
@@ -948,7 +916,7 @@ module Delta (K : Set) {{bij : bij K Nat}} where
       rewrite ! <| convert-bij1 {f = k}
       with dlt⇒list-In-1' in'
     ... | in'' rewrite convert-bij2 {{bij}} {t = bij.convert bij k}
-            = map-In in''
+      = map-In in''
 
     dlt⇒list-In-2 : {V : Set} {d : dd V} {k : K} {v : V} →
                       (k , v) In dlt⇒list d →
@@ -972,6 +940,40 @@ module Delta (K : Set) {{bij : bij K Nat}} where
            (map^2 · (map-ext bij-pair-2 · map-id))
            in''
 
+    list⇒dlt-key-In : {V : Set} {l : List (K ∧ V)} {k : K} {v : V} →
+                        (k , v) In l →
+                        dom (list⇒dlt l) k
+    list⇒dlt-key-In {_} {(k , v) :: l} {k} {v} LInH
+      rewrite foldl-++ {l1 = reverse <| map (λ where (k , v) → nat k , v) l} {(nat k , v) :: []} {_,,'_} {[]}
+        = _ , tr
+           (λ y → (nat k , v) ∈' y)
+           (! <| foldl-++ {l1 = reverse <| map (λ where (k , v) → nat k , v) l})
+           (n,v∈'d,,n,v {d = list⇒dlt' <| map (λ where (k , v) → nat k , v) l})
+    list⇒dlt-key-In {V} {(k' , v') :: l} {k} {v} (LInT in')
+      with list⇒dlt-key-In in'
+    ... | (_ , in'')
+      = _ , tr
+         (λ y → (nat k , vv) ∈' y)
+         (! <| foldl-++ {l1 = reverse <| map (λ where (k , v) → nat k , v) l})
+         lem'
+      where
+      nat-inj : ∀{k1 k2} → nat k1 == nat k2 → k1 == k2
+      nat-inj eq = ! (convert-bij1 {{bij}}) · (ap1 key eq · convert-bij1 {{bij}})
+      lem : Σ[ vv ∈ V ] ((nat k , vv) ∈' (list⇒dlt' (map (λ { (k , v) → nat k , v }) l) ,,' (nat k' , v')))
+      lem
+        with natEQ (nat k) (nat k')
+      ... | Inl eq rewrite ! <| nat-inj eq
+        = _ , n,v∈'d,,n,v {d = list⇒dlt' (map (λ { (k , v) → nat k , v }) l)}
+      ... | Inr ne = _ , n∈d→'n∈d+ ne in''
+      vv = π1 lem
+      lem' = π2 lem
+
+    -- contrapositives of some previous theorems
+    dlt⇒list-In-1-cp : {V : Set} {d : dd V} {k : K} → (Σ[ v ∈ V ] ((k , v) In dlt⇒list d) → ⊥) → k # d
+    dlt⇒list-In-1-cp {d = DD d} not-in = λ where (_ , in') → not-in (_ , (dlt⇒list-In-1 in'))
+    list⇒dlt-key-In-cp : {V : Set} {l : List (K ∧ V)} {k : K} → k # list⇒dlt l → Σ[ v ∈ V ] ((k , v) In l) → ⊥
+    list⇒dlt-key-In-cp k#d' (_ , k∈l) = k#d' (list⇒dlt-key-In k∈l)
+
     list⇒dlt-order : {V : Set} {l1 l2 : List (K ∧ V)} {k : K} {v1 v2 : V} →
                        (k , v1) ∈ (list⇒dlt ((k , v1) :: l1 ++ ((k , v2) :: l2)))
     list⇒dlt-order {_} {l1} {l2} {k} {v1} {v2}
@@ -981,19 +983,12 @@ module Delta (K : Set) {{bij : bij K Nat}} where
            (list⇒dlt-order' {l1 = map (λ where (k , v) → nat k , v) l1})
 
     dlt⇒list-inversion : {V : Set} {d : dd V} → list⇒dlt (dlt⇒list d) == d
-    dlt⇒list-inversion {V} {DD d}
-      = tr
-           (λ y → DD (list⇒dlt' y) == DD d)
-           (! (map^2 {f = λ { (k , v) → nat k , v }}
-                     {λ { (n , v) → key n , v }}
-                     {dlt⇒list' d}))
-           lem
-        where
-        lem' : ∀{l} → map {Nat ∧ V} ((λ { (k , v) → nat k , v }) ⊙ (λ { (n , v) → key n , v })) l == l
-        lem' {[]} = refl
-        lem' {(n , v) :: t} rewrite lem' {t} | convert-bij2 {t = n} = refl
-        lem : DD (list⇒dlt'
-                   (map ((λ { (k , v) → nat k , v }) ⊙ (λ { (n , v) → key n , v }))
-                     (dlt⇒list' d)))
-              == DD d
-        lem rewrite lem' {dlt⇒list' d} = ap1 DD dlt⇒list-inversion'
+    dlt⇒list-inversion {d = DD d} = extensional lem
+      where
+      lem : (k : K) → (list⇒dlt (dlt⇒list <| DD d) ⟨ k ⟩ == DD d ⟨ k ⟩)
+      lem k
+        with mem-dec (list⇒dlt (dlt⇒list <| DD d)) k
+      ... | Inl (_ , k∈d')
+        = lookup-cons-2 k∈d' · (k∈d' |> list⇒dlt-In |> dlt⇒list-In-2 |> lookup-cons-2 {d = DD d} |> !)
+      ... | Inr k#d'
+        = lookup-cp-1' k#d' · (k#d' |> list⇒dlt-key-In-cp |> dlt⇒list-In-1-cp |> lookup-cp-1' {d = d} |> !)
