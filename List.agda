@@ -230,6 +230,10 @@ module List where
   map-ext {l = []} ext = refl
   map-ext {l = a :: l} ext rewrite ext a | map-ext {l = l} ext = refl
 
+  map-id : ∀{A : Set} {l : List A} → map (λ a → a) l == l
+  map-id {l = []} = refl
+  map-id {l = a :: l} rewrite map-id {l = l} = refl
+
   map-len : ∀{A B : Set} {f : A → B} {l : List A} → ∥ map f l ∥ == ∥ l ∥
   map-len {l = []} = refl
   map-len {l = _ :: l} = 1+ap map-len
