@@ -572,6 +572,12 @@ module Delta (K : Set) {{bij : bij K Nat}} where
         rewrite foldl-++ {l1 = reverse (l1 ++ ((n , v2) :: l2))} {(n , v1) :: []} {_,,'_} {[]}
           = n,v∈'d,,n,v {d = foldl _,,'_ [] <| reverse (l1 ++ ((n , v2) :: l2))}
 
+      bij-pair-1 : {V : Set} (nv : Nat ∧ V) → (nat <| key <| π1 nv , π2 nv) == nv
+      bij-pair-1 (n , v) rewrite convert-bij2 {t = n} = refl
+
+      bij-pair-2 : {V : Set} (kv : K ∧ V) → (key <| nat <| π1 kv , π2 kv) == kv
+      bij-pair-2 (k , v) rewrite convert-bij1 {f = k} = refl
+
       -- TODO the other direction
       dlt⇒list-inversion' : {V : Set} {d : dl V} → list⇒dlt' (dlt⇒list' d) == d
       dlt⇒list-inversion' = {!!}
@@ -935,24 +941,44 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     dlt⇒list-size : {V : Set} {d : dd V} → ∥ dlt⇒list d ∥ == || d ||
     dlt⇒list-size {d = DD d} = map-len · dlt⇒list-size'
 
-    dlt⇒list-In-1 : {V : Set} {d : dl V} {n : Nat} {v : V} →
-                     (n , v) ∈' d →
-                     (n , v) In dlt⇒list' d
-    dlt⇒list-In-1 = dlt⇒list-In-1'
+    dlt⇒list-In-1 : {V : Set} {d : dd V} {k : K} {v : V} →
+                      (k , v) ∈ d →
+                      (k , v) In dlt⇒list d
+    dlt⇒list-In-1 {d = DD d} {k} in'
+      rewrite ! <| convert-bij1 {f = k}
+      with dlt⇒list-In-1' in'
+    ... | in'' rewrite convert-bij2 {{bij}} {t = bij.convert bij k}
+            = map-In in''
 
-    dlt⇒list-In-2 : {V : Set} {d : dl V} {n : Nat} {v : V} →
-                      (n , v) In dlt⇒list' d →
-                      (n , v) ∈' d
-    dlt⇒list-In-2 = dlt⇒list-In-2'
+    dlt⇒list-In-2 : {V : Set} {d : dd V} {k : K} {v : V} →
+                      (k , v) In dlt⇒list d →
+                      (k , v) ∈ d
+    dlt⇒list-In-2 {V} {d = DD d} {k} {v} in'
+      with map-In {f = λ where (k' , v') → (nat k' , v')} in'
+    ... | in'' rewrite map^2 {f = λ where (k' , v') → (nat k' , v')} {g = λ where (n' , v') → (key n' , v')} {l = dlt⇒list' d}
+      = dlt⇒list-In-2' (tr
+          (λ y → (nat k , v) In y)
+          (map^2 · (map-ext bij-pair-1 · map-id))
+          (map-In {f = λ where (k , v) → (nat k , v)} in'))
 
-    list⇒dlt-In : {V : Set} {l : dl V} {n : Nat} {v : V} →
-                   (n , v) ∈' list⇒dlt' l →
-                   (n , v) In l
-    list⇒dlt-In = list⇒dlt-In'
+    list⇒dlt-In : {V : Set} {l : List (K ∧ V)} {k : K} {v : V} →
+                    (k , v) ∈ list⇒dlt l →
+                    (k , v) In l
+    list⇒dlt-In {l = l} {k} {v} in'
+      with list⇒dlt-In' {l = map (λ { (k , v) → nat k , v }) l} in' |> map-In {f = λ where (n , v) → key n , v}
+    ... | in'' rewrite convert-bij1 {f = k}
+      = tr
+           (λ y → (k , v) In y)
+           (map^2 · (map-ext bij-pair-2 · map-id))
+           in''
 
-    list⇒dlt-order : {V : Set} {l1 l2 : dl V} {n : Nat} {v1 v2 : V} →
-                      (n , v1) ∈' (list⇒dlt' ((n , v1) :: l1 ++ ((n , v2) :: l2)))
-    list⇒dlt-order {l1 = l1} {l2} {v1} = list⇒dlt-order' {l1 = l1} {l2} {v1}
+    list⇒dlt-order : {V : Set} {l1 l2 : List (K ∧ V)} {k : K} {v1 v2 : V} →
+                       (k , v1) ∈ (list⇒dlt ((k , v1) :: l1 ++ ((k , v2) :: l2)))
+    list⇒dlt-order {_} {l1} {l2} {k} {v1} {v2}
+      = tr
+           (λ y → (nat k , v1) ∈' foldl _,,'_ [] (reverse y ++ ((nat k , v1) :: [])))
+           (map-++-comm {a = l1})
+           (list⇒dlt-order' {l1 = map (λ where (k , v) → nat k , v) l1})
 
     dlt⇒list-inversion : {V : Set} {d : dd V} → list⇒dlt (dlt⇒list d) == d
     dlt⇒list-inversion {V} {DD d}
