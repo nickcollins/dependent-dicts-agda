@@ -561,9 +561,9 @@ module delta-lemmas (K : Set) {{bij : bij K Nat}} where
   ... | Inr (Inl refl) = refl
   ... | Inr (Inr nh<n) = ap1 ((nh , f vh) ::_) (dltmap-func' {d = d})
 
-  -- TODO these proofs could use refactoring -
-  -- contraction should probably make use of ==-dec and
-  -- exchange is way too long and repetitive
+  -- these proofs could use refactoring -
+  -- contraction should probably make use of ==-dec'
+  -- and exchange is way too long and repetitive
 
   contraction' : {V : Set} {d : dl V} {n : Nat} {v v' : V} → (d ,,' (n , v')) ,,' (n , v) == d ,,' (n , v)
   contraction' {d = []} {n} rewrite <dec-refl n = refl
