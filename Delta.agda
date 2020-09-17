@@ -67,13 +67,15 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     _∈_ : {V : Set} (p : K ∧ V) → (d : dd V) → Set
     _∈_ {V} (k , v) (DD d) = _∈'_ {V} (nat k , v) d
 
-    -- domain
-    dom : {V : Set} → dd V → K → Set
-    dom {V} (DD d) k = dom' {V} d (nat k)
+  -- domain (not abstract)
+  dom : {V : Set} → dd V → K → Set
+  dom {V} d k = Σ[ v ∈ V ] ((k , v) ∈ d)
 
-    -- apartness, i.e. the opposite of dom
-    _#_ : {V : Set} (k : K) → (d : dd V) → Set
-    k # (DD d) = (nat k) #' d
+  -- apartness, i.e. the opposite of dom (not abstract)
+  _#_ : {V : Set} → K → dd V → Set
+  k # d = dom d k → ⊥
+
+  abstract
 
     -- maps f across the values of the delta dict
     dltmap : {A B : Set} → (A → B) → dd A → dd B
