@@ -254,6 +254,20 @@ module delta-lemmas (K : Set) {{bij : bij K Nat}} where
   ... | Inr (Inr hn2<hn1) | Inr (Inr hn1<hn2)
           = abort (<antisym hn1<hn2 hn2<hn1)
 
+  ==-dec' : {V : Set}
+             (d1 d2 : dl V) →
+             ((v1 v2 : V) → v1 == v2 ∨ v1 ≠ v2) →
+             d1 == d2 ∨ d1 ≠ d2
+  ==-dec' [] [] _ = Inl refl
+  ==-dec' [] (_ :: _) _ = Inr (λ ())
+  ==-dec' (_ :: _) [] _ = Inr (λ ())
+  ==-dec' ((hn1 , hv1) :: t1) ((hn2 , hv2) :: t2) V==dec
+    with natEQ hn1 hn2 | V==dec hv1 hv2 | ==-dec' t1 t2 V==dec
+  ... | Inl refl | Inl refl | Inl refl = Inl refl
+  ... | Inl refl | Inl refl | Inr ne   = Inr λ where refl → ne refl
+  ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
+  ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
+
   delete' : {V : Set} {d : dl V} {n : Nat} {v : V} →
              (n , v) ∈' d →
              Σ[ d⁻ ∈ dl V ] (

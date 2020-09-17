@@ -173,21 +173,10 @@ module Delta (K : Set) {{bij : bij K Nat}} where
               (d1 d2 : dd V) →
               ((v1 v2 : V) → v1 == v2 ∨ v1 ≠ v2) →
               d1 == d2 ∨ d1 ≠ d2
-    ==-dec {V} (DD d1) (DD d2) h = ==-dec' {V} d1 d2 h
-      where
-      ==-dec' : {V : Set}
-                 (d1 d2 : dl V) →
-                 ((v1 v2 : V) → v1 == v2 ∨ v1 ≠ v2) →
-                 DD d1 == DD d2 ∨ DD d1 ≠ DD d2
-      ==-dec' [] [] _ = Inl refl
-      ==-dec' [] (_ :: _) _ = Inr (λ ())
-      ==-dec' (_ :: _) [] _ = Inr (λ ())
-      ==-dec' ((hn1 , hv1) :: t1) ((hn2 , hv2) :: t2) V==dec
-        with natEQ hn1 hn2 | V==dec hv1 hv2 | ==-dec' t1 t2 V==dec
-      ... | Inl refl | Inl refl | Inl refl = Inl refl
-      ... | Inl refl | Inl refl | Inr ne   = Inr λ where refl → ne refl
-      ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
-      ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
+    ==-dec {V} (DD d1) (DD d2) h
+      with ==-dec' {V} d1 d2 h
+    ... | Inl refl = Inl refl
+    ... | Inr ne   = Inr (λ where refl → ne refl)
 
     -- The next two theorems specify the behavior of destruct and prove that
     -- it behaves as intended. The third one combines them to match the paper.
