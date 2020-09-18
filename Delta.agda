@@ -152,7 +152,7 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     ■-def : {V : Set} {k : K} {v : V} → (■ (k , v)) == ∅ ,, (k , v)
     ■-def = refl
 
-    -- extensionality of Delta dicts
+    -- Theorem 2: Extensionality
     -- (i.e. if two dicts represent the same mapping from ids to values,
     -- then they are reflexively equal as judged by _==_)
     extensional : {V : Set} {d1 d2 : dd V} →
@@ -168,7 +168,7 @@ module Delta (K : Set) {{bij : bij K Nat}} where
           with all-bindings-== k
         ... | eq rewrite surj = eq
 
-    -- decidable equality of delta dicts
+    -- Theorem 3: Decidable Equality
     ==-dec : {V : Set}
               (d1 d2 : dd V) →
               ((v1 v2 : V) → v1 == v2 ∨ v1 ≠ v2) →
@@ -202,7 +202,7 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     ... | Inr (Inl eq) = abort (n≠n+1+m (eq · (n+1+m==1+n+m · +comm {1+ m})))
     ... | Inr (Inr gt) = abort (<antisym gt (n<m→n<s+m n<1+n))
 
-    -- The destruct theorem as seen in the paper
+    -- Theorem 4: Not-So-Easy Destructibility
     destruct-thm : ∀{V} {d d' : dd V} {k : K} {v : V} →
                      (destruct d == None → d == ∅)
                        ∧
@@ -228,11 +228,13 @@ module Delta (K : Set) {{bij : bij K Nat}} where
 
     ---- contraction and exchange ----
 
+    -- Theorem 5
     contraction : {V : Set} {d : dd V} {k : K} {v v' : V} →
                    d ,, (k , v') ,, (k , v) == d ,, (k , v)
     contraction {V} {DD d} {k} {v} {v'}
       = ap1 DD <| contraction' {d = d} {nat k} {v} {v'}
 
+    -- Theorem 6
     exchange : {V : Set} {d : dd V} {k1 k2 : K} {v1 v2 : V} →
                 k1 ≠ k2 →
                 d ,, (k1 , v1) ,, (k2 , v2) == d ,, (k2 , v2) ,, (k1 , v1)
