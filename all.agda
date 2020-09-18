@@ -5,3 +5,4 @@ open import Int
 open import Bij
 open import delta-lemmas
 open import Delta
+open import NatDelta
