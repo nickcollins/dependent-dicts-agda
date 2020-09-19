@@ -26,6 +26,14 @@ module Nat where
   n < m = n ≤ m ∧ n ≠ m
   infix 40 _<_
 
+  -- The `difference` operation accepts two numbers n and m and a proof that n ≤ m.
+  -- Alternative definitions could return an option, returning None if n > m,
+  -- or truncation, returning 0 if n > m. The latter may make some of the work easier,
+  -- if it allows us to avoid issues with proof relevance. Even so, many proofs would
+  -- still need to make use of the proof that n ≤ m to establish that the difference is
+  -- not arbitrarily 0. As such, we believe that refactoring to use the perhaps more
+  -- conventional truncation approach would not necessarily go far enough in cleaning up
+  -- proofs as to be worth the refactoring effort.
   difference : ∀{n m} → n ≤ m → Nat
   difference {n} {.n} ≤refl = Z
   difference {n} {.(1+ _)} (≤1+ n≤m-1) = 1+ (difference n≤m-1)

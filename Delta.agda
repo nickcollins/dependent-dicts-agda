@@ -20,7 +20,6 @@ open import Bij
 -- * == is used for reflexive equality
 -- * Z is zero, 1+ is suc
 -- * ≤ is defined as data, < is defined as n < m = n ≤ m ∧ n ≠ m
--- * TODO if we don't switch to truncation, we need to talk about subtraction
 -- * l⟦ i ⟧ is used to (maybe) get the ith element of list l
 -- * ∥ l ∥ is the length of a list
 --
