@@ -126,28 +126,28 @@ module delta-lemmas (K : Set) {{bij : bij K Nat}} where
           | +comm {1+ x1 + n} {x}
       = n≠n+1+m
 
-  lookup-cons-1' : {V : Set} {d : dl V} {n : Nat} {v : V} → d lkup n == Some v → (n , v) ∈' d
-  lookup-cons-1' {d = []} ()
-  lookup-cons-1' {d = ((hn , hv) :: t)} {n} h
+  lookup-cons-2' : {V : Set} {d : dl V} {n : Nat} {v : V} → d lkup n == Some v → (n , v) ∈' d
+  lookup-cons-2' {d = []} ()
+  lookup-cons-2' {d = ((hn , hv) :: t)} {n} h
     with <dec n hn
-  lookup-cons-1' {d = ((hn , hv) :: t)} {n} ()     | Inl _
-  lookup-cons-1' {d = ((hn , hv) :: t)} {.hn} refl | Inr (Inl refl) = InH
-  lookup-cons-1' {d = ((hn , hv) :: t)} {n} {v} h  | Inr (Inr hn<n)
+  lookup-cons-2' {d = ((hn , hv) :: t)} {n} ()     | Inl _
+  lookup-cons-2' {d = ((hn , hv) :: t)} {.hn} refl | Inr (Inl refl) = InH
+  lookup-cons-2' {d = ((hn , hv) :: t)} {n} {v} h  | Inr (Inr hn<n)
     = tr
         (λ y → (y , v) ∈' ((hn , hv) :: t))
         (m-n+n==m (n<m→1+n≤m hn<n))
-        (InT (lookup-cons-1' {d = t} h))
+        (InT (lookup-cons-2' {d = t} h))
 
-  lookup-cons-2' : {V : Set} {d : dl V} {n : Nat} {v : V} →
+  lookup-cons-1' : {V : Set} {d : dl V} {n : Nat} {v : V} →
                     (n , v) ∈' d →
                     d lkup n == Some v
-  lookup-cons-2' {n = x} InH rewrite <dec-refl x = refl
-  lookup-cons-2' (InT {d = d} {n = x} {s} {v} x∈d)
+  lookup-cons-1' {n = x} InH rewrite <dec-refl x = refl
+  lookup-cons-1' (InT {d = d} {n = x} {s} {v} x∈d)
     with <dec (x + 1+ s) s
   ... | Inl x+1+s<s        = abort (<antisym x+1+s<s (n<m→n<s+m n<1+n))
   ... | Inr (Inl x+1+s==s) = abort ((flip n≠n+1+m) (n+1+m==1+n+m · (+comm {1+ s} · x+1+s==s)))
   ... | Inr (Inr s<x+1+s)
-    with lookup-cons-2' x∈d
+    with lookup-cons-1' x∈d
   ... | h rewrite ! (undelta s x s<x+1+s) = h
 
   n,v∈'d,,n,v : {V : Set} {d : dl V} {n : Nat} {v : V} → (n , v) ∈' (d ,,' (n , v))
@@ -330,12 +330,12 @@ module delta-lemmas (K : Set) {{bij : bij K Nat}} where
   ... | Some v = Inl (v , refl)
   ... | None   = Inr refl
 
-  lookup-cp-1' : {V : Set} {d : dl V} {n : Nat} →
+  lookup-cp-2' : {V : Set} {d : dl V} {n : Nat} →
                   n #' d →
                   d lkup n == None
-  lookup-cp-1' {d = d} {n} n#d
+  lookup-cp-2' {d = d} {n} n#d
     with lookup-dec' d n
-  ... | Inl (_ , n∈d) = abort (n#d (_ , lookup-cons-1' n∈d))
+  ... | Inl (_ , n∈d) = abort (n#d (_ , lookup-cons-2' n∈d))
   ... | Inr n#'d      = n#'d
 
   n#d→'n#d+ : {V : Set} {d : dl V} {n n' : Nat} {v' : V} →
@@ -417,7 +417,7 @@ module delta-lemmas (K : Set) {{bij : bij K Nat}} where
                     (x , v) ∈' d2 →
                     (x + n , v) ∈' (union' m d1 d2 n)
   lemma-union'-2 {d1 = d1} x+n#d1 (InH {d = d2})
-    rewrite lookup-cp-1' x+n#d1
+    rewrite lookup-cp-2' x+n#d1
       = lemma-union'-0 {d2 = d2} {n = Z} (n,v∈'d,,n,v {d = d1})
   lemma-union'-2 {d1 = d1} {n = n} x+n#d1 (InT {d = d2} {n = x} {s} x∈d2)
     rewrite +assc {x} {1+ s} {n}
@@ -438,7 +438,7 @@ module delta-lemmas (K : Set) {{bij : bij K Nat}} where
                     (x , v2) ∈' d2 →
                     (x + n , m v1 v2) ∈' (union' m d1 d2 n)
   lemma-union'-3 {d1 = d1} x+n∈d1 (InH {d = d2})
-    rewrite lookup-cons-2' x+n∈d1
+    rewrite lookup-cons-1' x+n∈d1
       = lemma-union'-0 {d2 = d2} {n = Z} (n,v∈'d,,n,v {d = d1})
   lemma-union'-3 {d1 = d1} {n = n} x+n∈d1 (InT {d = d2} {n = x} {s} x∈d2)
     rewrite +assc {x} {1+ s} {n}
@@ -535,7 +535,7 @@ module delta-lemmas (K : Set) {{bij : bij K Nat}} where
     with natEQ n n'
   ... | Inr ne   = LInT (list⇒dlt-In' (n∈d+→'n∈d ne ∈h))
   ... | Inl refl
-    rewrite someinj <| (! <| lookup-cons-2' ∈h) · (lookup-cons-2' {n = n} {v'} <| n,v∈'d,,n,v {d = foldl _,,'_ [] (reverse l)})
+    rewrite someinj <| (! <| lookup-cons-1' ∈h) · (lookup-cons-1' {n = n} {v'} <| n,v∈'d,,n,v {d = foldl _,,'_ [] (reverse l)})
       = LInH
 
   list⇒dlt-order' : {V : Set} {l1 l2 : dl V} {n : Nat} {v1 v2 : V} →
@@ -598,34 +598,34 @@ module delta-lemmas (K : Set) {{bij : bij K Nat}} where
       ... | n∈d+1
         with n∈d→'n∈d+ {v' = v2} n≠n2 n∈d+1 | n,v∈'d,,n,v {d = d ,,' (n2 , v2)} {n1} {v1}
       ... | n∈d++1 | n∈d++2
-        rewrite lookup-cons-2' n∈d++1 | lookup-cons-2' n∈d++2 = refl
+        rewrite lookup-cons-1' n∈d++1 | lookup-cons-1' n∈d++2 = refl
       fun n1 | Inl refl | Inr n≠n2 | Inr n1#d
         with n,v∈'d,,n,v {d = d} {n1} {v1}
       ... | n∈d+1
         with n∈d→'n∈d+ {v' = v2} n≠n2 n∈d+1 | n,v∈'d,,n,v {d = d ,,' (n2 , v2)} {n1} {v1}
       ... | n∈d++1 | n∈d++2
-        rewrite lookup-cons-2' n∈d++1 | lookup-cons-2' n∈d++2 = refl
+        rewrite lookup-cons-1' n∈d++1 | lookup-cons-1' n∈d++2 = refl
       fun n2 | Inr n≠n1 | Inl refl | Inl (_ , n2∈d)
         with n,v∈'d,,n,v {d = d} {n2} {v2}
       ... | n∈d+2
         with n∈d→'n∈d+ {v' = v1} n≠n1 n∈d+2 | n,v∈'d,,n,v {d = d ,,' (n1 , v1)} {n2} {v2}
       ... | n∈d++1 | n∈d++2
-        rewrite lookup-cons-2' n∈d++1 | lookup-cons-2' n∈d++2 = refl
+        rewrite lookup-cons-1' n∈d++1 | lookup-cons-1' n∈d++2 = refl
       fun n2 | Inr n≠n1 | Inl refl | Inr n2#d
         with n,v∈'d,,n,v {d = d} {n2} {v2}
       ... | n∈d+2
         with n∈d→'n∈d+ {v' = v1} n≠n1 n∈d+2 | n,v∈'d,,n,v {d = d ,,' (n1 , v1)} {n2} {v2}
       ... | n∈d++1 | n∈d++2
-        rewrite lookup-cons-2' n∈d++1 | lookup-cons-2' n∈d++2 = refl
+        rewrite lookup-cons-1' n∈d++1 | lookup-cons-1' n∈d++2 = refl
       fun n  | Inr n≠n1 | Inr n≠n2 | Inl (_ , n∈d)
         with n∈d→'n∈d+ {v' = v1} n≠n1 n∈d   | n∈d→'n∈d+ {v' = v2} n≠n2 n∈d
       ... | n∈d+1  | n∈d+2
         with n∈d→'n∈d+ {v' = v2} n≠n2 n∈d+1 | n∈d→'n∈d+ {v' = v1} n≠n1 n∈d+2
       ... | n∈d++1 | n∈d++2
-        rewrite lookup-cons-2' n∈d++1 | lookup-cons-2' n∈d++2 = refl
+        rewrite lookup-cons-1' n∈d++1 | lookup-cons-1' n∈d++2 = refl
       fun n  | Inr n≠n1 | Inr n≠n2 | Inr n#d
         with n#d→'n#d+ {v' = v1} n≠n1 n#d   | n#d→'n#d+ {v' = v2} n≠n2 n#d
       ... | n#d+1  | n#d+2
         with n#d→'n#d+ {v' = v2} n≠n2 n#d+1 | n#d→'n#d+ {v' = v1} n≠n1 n#d+2
       ... | n#d++1 | n#d++2
-        rewrite lookup-cp-1' n#d++1 | lookup-cp-1' n#d++2 = refl
+        rewrite lookup-cp-2' n#d++1 | lookup-cp-2' n#d++2 = refl

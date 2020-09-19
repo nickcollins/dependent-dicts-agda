@@ -23,6 +23,9 @@ open import Bij
 -- * TODO if we don't switch to truncation, we need to talk about subtraction
 -- * l⟦ i ⟧ is used to (maybe) get the ith element of list l
 -- * ∥ l ∥ is the length of a list
+--
+-- Many of the definitions and theorems are documented to indicate their equivalents
+-- in the Coq standard libraries Coq.FSets.FMapInterface and Coq.FSets.FMapFacts
 module Delta (K : Set) {{bij : bij K Nat}} where
   abstract -- almost everything in the module is abstract
 
@@ -33,7 +36,7 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     data dd (V : Set) : Set where
       DD : dl V → dd V
 
-    -- nil
+    -- nil/empty
     ∅ : {V : Set} → dd V
     ∅ = DD []
 
@@ -42,15 +45,18 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     ■_ (k , v) = DD <| (nat k , v) :: []
 
     -- extension/insertion
+    -- Corresponds to FMapInterface.add
     _,,_ : ∀{V} → dd V → (K ∧ V) → dd V
     (DD d) ,, (k , v) = DD <| d ,,' (nat k , v)
 
     infixl 10 _,,_
 
     -- lookup function
+    -- Corresponds to FMapInterface.find
     _⟨_⟩ : {V : Set} → dd V → K → Maybe V
     (DD d) ⟨ k ⟩ = d lkup (nat k)
 
+    -- There doesn't appear to be a corresponding function in FMapInterface
     destruct : ∀{V} → dd V → Maybe ((K ∧ V) ∧ dd V)
     destruct (DD [])
       = None
@@ -60,14 +66,17 @@ module Delta (K : Set) {{bij : bij K Nat}} where
       = Some ((key n , v) , DD ((m + 1+ n , v') :: dd))
 
     -- size
+    -- Corresponds to FMapInterface.cardinal
     ||_|| : {V : Set} → dd V → Nat
     || DD d || = ∥ d ∥
 
     -- membership
+    -- Corresponds to FMapInterface.MapsTo
     _∈_ : {V : Set} (p : K ∧ V) → (d : dd V) → Set
     _∈_ {V} (k , v) (DD d) = _∈'_ {V} (nat k , v) d
 
   -- domain (not abstract)
+  -- Corresponds to FMapInterface.In
   dom : {V : Set} → dd V → K → Set
   dom {V} d k = Σ[ v ∈ V ] ((k , v) ∈ d)
 
@@ -78,13 +87,16 @@ module Delta (K : Set) {{bij : bij K Nat}} where
   abstract
 
     -- maps f across the values of the delta dict
+    -- Corresponds to FMapInterface.map
     dltmap : {A B : Set} → (A → B) → dd A → dd B
     dltmap f (DD d) = DD <| map (λ {(hn , hv) → (hn , f hv)}) d
 
+    -- FMapInterface doesn't appear to have a corresponding function
     list⇒dlt : {V : Set} → List (K ∧ V) → dd V
     list⇒dlt d = d |> map (λ where (k , v) → (nat k , v)) |> list⇒dlt' |> DD
 
     -- converts a delta dict into a list of key-value pairs; the inverse of list⇒dlt
+    -- Corresponds to FMapInterface.elements
     dlt⇒list : {V : Set} → dd V → List (K ∧ V)
     dlt⇒list (DD d) = dlt⇒list' d |> map (λ where (n , v) → (key n , v))
 
@@ -98,22 +110,35 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     -- The next two theorems show that lookup (_⟨_⟩) is consistent with membership (_∈_)
     -- As such, future theorems which relate to membership can be taken to appropriately
     -- comment on lookup as well.
+    -- Corresponds to FMapInterface.find_1
     lookup-cons-1 : {V : Set} {d : dd V} {k : K} {v : V} →
-                     d ⟨ k ⟩ == Some v →
-                     (k , v) ∈ d
-    lookup-cons-1 {V} {DD d} {k} {v} h = lookup-cons-1' {d = d} {nat k} h
-
-    lookup-cons-2 : {V : Set} {d : dd V} {k : K} {v : V} →
                      (k , v) ∈ d →
                      d ⟨ k ⟩ == Some v
-    lookup-cons-2 {V} {DD d} {k} {v} = lookup-cons-2' {V} {d} {nat k} {v}
+    lookup-cons-1 {V} {DD d} {k} {v} = lookup-cons-1' {V} {d} {nat k} {v}
+
+    -- Corresponds to FMapInterface.find_2
+    lookup-cons-2 : {V : Set} {d : dd V} {k : K} {v : V} →
+                     d ⟨ k ⟩ == Some v →
+                     (k , v) ∈ d
+    lookup-cons-2 {V} {DD d} {k} {v} h = lookup-cons-2' {d = d} {nat k} h
 
     -- membership (_∈_) respects insertion (_,,_)
+    -- Corresponds to FMapInterface.add_1
     k,v∈d,,k,v : {V : Set} {d : dd V} {k : K} {v : V} →
                   (k , v) ∈ (d ,, (k , v))
     k,v∈d,,k,v {V} {d = DD d} {k} = n,v∈'d,,n,v {d = d} {nat k}
 
+    -- insertion respects membership
+    -- Corresponds to FMapInterface.add_2
+    k∈d→k∈d+ : {V : Set} {d : dd V} {k k' : K} {v v' : V} →
+                  k ≠ k' →
+                  (k , v) ∈ d →
+                  (k , v) ∈ (d ,, (k' , v'))
+    k∈d→k∈d+ {V} {DD d} {k} {k'} {v} {v'} ne h
+      = n∈d→'n∈d+ {V} {d} {nat k} {nat k'} {v} {v'} (inj-cp ne) h
+
     -- insertion can't generate spurious membership
+    -- Corresponds to FMapInterface.add_3
     k∈d+→k∈d : {V : Set} {d : dd V} {k k' : K} {v v' : V} →
                 k ≠ k' →
                 (k , v) ∈ (d ,, (k' , v')) →
@@ -121,30 +146,25 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     k∈d+→k∈d {V} {d = DD d} {k} {k'} {v} {v'} ne h
       = n∈d+→'n∈d {V} {d} {nat k} {nat k'} {v} {v'} (inj-cp ne) h
 
-    -- insertion respects membership
-    k∈d→k∈d+ : {V : Set} {d : dd V} {k k' : K} {v v' : V} →
-                k ≠ k' →
-                (k , v) ∈ d →
-                (k , v) ∈ (d ,, (k' , v'))
-    k∈d→k∈d+ {V} {DD d} {k} {k'} {v} {v'} ne h
-      = n∈d→'n∈d+ {V} {d} {nat k} {nat k'} {v} {v'} (inj-cp ne) h
-
     -- Decidability of membership
     -- This also packages up an appeal to delta dict membership into a form that
     -- lets us retain more information
+    -- Corresponds to FMapFacts.In_dec
     mem-dec : {V : Set} (d : dd V) (k : K) → dom d k ∨ k # d
     mem-dec {V} (DD d) k = mem-dec' {V} d (nat k)
 
     -- delta dicts contain at most one binding for each variable
+    -- Corresponds to FMapFacts.MapsTo_fun
     mem-unicity : {V : Set} {d : dd V} {k : K} {v v' : V} →
                    (k , v) ∈ d →
                    (k , v') ∈ d →
                    v == v'
     mem-unicity vh v'h
-      with lookup-cons-2 vh | lookup-cons-2 v'h
+      with lookup-cons-1 vh | lookup-cons-1 v'h
     ... | vh' | v'h' = someinj (! vh' · v'h')
 
     -- meaning of nil, i.e. nothing is in nil
+    -- Corresponds to FMapFacts.empty_in_iff
     k#∅ : {V : Set} {k : K} → _#_ {V} k ∅
     k#∅ (_ , ())
 
@@ -155,6 +175,7 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     -- Theorem 2: Extensionality
     -- (i.e. if two dicts represent the same mapping from ids to values,
     -- then they are reflexively equal as judged by _==_)
+    -- Corresponds to FMapFacts.Equal_Equiv
     extensional : {V : Set} {d1 d2 : dd V} →
                    ((k : K) → d1 ⟨ k ⟩ == d2 ⟨ k ⟩) →
                    d1 == d2
@@ -169,6 +190,7 @@ module Delta (K : Set) {{bij : bij K Nat}} where
         ... | eq rewrite surj = eq
 
     -- Theorem 3: Decidable Equality
+    -- This doesn't seem to directly correspond to any of the Coq theorems
     ==-dec : {V : Set}
               (d1 d2 : dd V) →
               ((v1 v2 : V) → v1 == v2 ∨ v1 ≠ v2) →
@@ -211,12 +233,14 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     destruct-thm = destruct-thm-1 , destruct-thm-2
 
     -- When using destruct or delete, this theorem is useful for establishing termination
+    -- Roughly corresponds to FMapFacts.cardinal_2
     extend-size : {V : Set} {d : dd V} {k : K} {v : V} →
                    k # d →
                    || d ,, (k , v) || == 1+ || d ||
     extend-size {V} {DD d} {k} {v} n#d = extend-size' {V} {d} {nat k} {v} n#d
 
     -- remove a specific mapping from a delta dict
+    -- Roughly corresponds to FMapInterface.remove, and associated theorems
     delete : {V : Set} {d : dd V} {k : K} {v : V} →
               (k , v) ∈ d →
               Σ[ d⁻ ∈ dd V ] (
@@ -280,15 +304,18 @@ module Delta (K : Set) {{bij : bij K Nat}} where
 
     ---- dltmap theorem ----
 
+    -- The Coq.FSets library uses different theorems to establish to specify map
     dltmap-func : {V1 V2 : Set} {d : dd V1} {f : V1 → V2} {k : K} {v : V1} →
                    dltmap f (d ,, (k , v)) == dltmap f d ,, (k , f v)
     dltmap-func {d = DD d} {f} {k} {v} = ap1 DD (dltmap-func' {d = d})
 
     ---- dlt <=> list theorems ----
 
+    -- Corresponds to FMapInterface.cardinal_1
     dlt⇒list-size : {V : Set} {d : dd V} → ∥ dlt⇒list d ∥ == || d ||
     dlt⇒list-size {d = DD d} = map-len · dlt⇒list-size'
 
+    -- Corresponds to FMapInterface.elements_1
     dlt⇒list-In-1 : {V : Set} {d : dd V} {k : K} {v : V} →
                       (k , v) ∈ d →
                       (k , v) In dlt⇒list d
@@ -298,6 +325,7 @@ module Delta (K : Set) {{bij : bij K Nat}} where
     ... | in'' rewrite convert-bij2 {{bij}} {t = bij.convert bij k}
       = map-In in''
 
+    -- Corresponds to FMapInterface.elements_2
     dlt⇒list-In-2 : {V : Set} {d : dd V} {k : K} {v : V} →
                       (k , v) In dlt⇒list d →
                       (k , v) ∈ d
@@ -369,6 +397,6 @@ module Delta (K : Set) {{bij : bij K Nat}} where
       lem k
         with mem-dec (list⇒dlt (dlt⇒list <| DD d)) k
       ... | Inl (_ , k∈d')
-        = lookup-cons-2 k∈d' · (k∈d' |> list⇒dlt-In |> dlt⇒list-In-2 |> lookup-cons-2 {d = DD d} |> !)
+        = lookup-cons-1 k∈d' · (k∈d' |> list⇒dlt-In |> dlt⇒list-In-2 |> lookup-cons-1 {d = DD d} |> !)
       ... | Inr k#d'
-        = lookup-cp-1' k#d' · (k#d' |> list⇒dlt-key-In-cp |> dlt⇒list-In-1-cp |> lookup-cp-1' {d = d} |> !)
+        = lookup-cp-2' k#d' · (k#d' |> list⇒dlt-key-In-cp |> dlt⇒list-In-1-cp |> lookup-cp-2' {d = d} |> !)
